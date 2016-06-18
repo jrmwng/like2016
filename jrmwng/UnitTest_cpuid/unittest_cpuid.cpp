@@ -29,11 +29,14 @@ namespace UnitTest_cpuid
 
 			cpuid_t<0x00000000U> cpuid00000000 = cpuidStandardTree;
 			cpuid_t<0x00000001U> cpuid00000001 = cpuidStandardTree;
+			cpuid_t<0x00000004U, 0> cpuid00000004_0 = cpuidStandardTree;
+			cpuid_t<0x00000004U, 1> cpuid00000004_1 = cpuidStandardTree;
+			cpuid_t<0x00000004U, 2> cpuid00000004_2 = cpuidStandardTree;
+			cpuid_t<0x00000004U, 3> cpuid00000004_3 = cpuidStandardTree;
+			cpuid_t<0x00000007U> cpuid00000007 = cpuidStandardTree;
 			cpuid_t<0x80000000U> cpuid80000000 = cpuidExtendedTree;
+			cpuid_t<0x80000000U> cpuid80000001 = cpuidExtendedTree;
 			cpuid_t<0x40000000U> cpuid40000000 = cpuidHypervisorTree;
-
-
-			// TODO: Your test code here
 		}
 
 	};
