@@ -123,7 +123,7 @@ namespace jrmwng
 				}
 				aatOutput[j][k] = tAcc0;
 			});
-		});
+		}
 	}
 	template <size_t uN4>
 	void dct(__m256d const (&alr4Input)[uN4], __m256d(&alr4Output)[uN4])

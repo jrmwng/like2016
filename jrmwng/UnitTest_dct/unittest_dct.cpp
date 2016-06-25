@@ -22,21 +22,35 @@ namespace UnitTest_dct
 		{
 			using namespace jrmwng;
 
-			double alrInput[8] = { 0 };
+			double alrInput[8];
+			__m128d alr2Input[4];
+			__m256d alr4Input[2];
 			{
-				std::fill(std::begin(alrInput), std::end(alrInput), 1.0F);
+				std::fill(std::begin(alrInput), std::end(alrInput), 1.0);
+				std::fill(std::begin(alr2Input), std::end(alr2Input), _mm_set1_pd(1.0));
+				std::fill(std::begin(alr4Input), std::end(alr4Input), _mm256_set1_pd(1.0));
 			}
 
-			double alrOutput[8] = { 0 };
+			double alrOutput[8];
+			__m128d alr2Output[4];
+			__m256d alr4Output[2];
 			{
 				dct(alrInput, alrOutput);
+				dct(alr2Input, alr2Output);
+				dct(alr4Input, alr4Output);
+
+				for (unsigned i = 0; i < 8; i++)
+				{
+					if (alrOutput[i] != alr2Output->m128d_f64[i])
+					{
+						Assert::AreEqual(alrOutput[i], alr2Output->m128d_f64[i]);
+					}
+					if (alrOutput[i] != alr4Output->m256d_f64[i])
+					{
+						Assert::AreEqual(alrOutput[i], alr4Output->m256d_f64[i]);
+					}
+				}
 			}
-
-			Assert::AreEqual<double>(8, alrOutput[0]);
-
-			dct_matrix<float, 8> stMatrix8;
-
-			Assert::AreEqual<float>(1.0F, stMatrix8[0][0]);
 		}
 
 	};
