@@ -95,22 +95,30 @@ namespace jrmwng
 		auto const & dctMatrixM = dct_matrix<T, uM>::g_Instance;
 		auto const & dctMatrixN = dct_matrix<T, uN>::g_Instance;
 
-		dct_for_each(std::make_index_sequence<uM>(), [&](auto const j)
+		dct_for_each(std::make_index_sequence<uN>(), [&](auto const k)
 		{
-			dct_for_each(std::make_index_sequence<uN>(), [&](auto const k)
+			T atAcc1[uM];
+			{
+				dct_for_each(std::make_index_sequence<uM>(), [&](auto const m)
+				{
+					T tAcc1(0);
+					{
+						dct_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+						{
+							tAcc1 += aatInput[m][n] * dctMatrixN[n][k];
+						});
+					}
+					atAcc1[m] = tAcc1;
+				});
+			}
+
+			dct_for_each(std::make_index_sequence<uM>(), [&](auto const j)
 			{
 				T tAcc0(0);
 				{
 					dct_for_each(std::make_index_sequence<uM>(), [&](auto const m)
 					{
-						T tAcc1(0);
-						{
-							dct_for_each(std::make_index_sequence<uN>(), [&](auto const n)
-							{
-								tAcc1 += aatInput[m][n] * dctMatrixN[n][k];
-							});
-						}
-						tAcc0 += tAcc1 * dctMatrixM[m][j];
+						tAcc0 += atAcc1[m] * dctMatrixM[m][j];
 					});
 				}
 				aatOutput[j][k] = tAcc0;
