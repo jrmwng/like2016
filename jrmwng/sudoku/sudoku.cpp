@@ -4,6 +4,7 @@
 #include "sudoku.h"
 
 #include <iostream>
+#include <fstream>
 #include <memory>
 
 std::ostream & operator<< (std::ostream & os, jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>::number_t const & stSudokuNumber)
@@ -52,6 +53,21 @@ int main()
 {
 	std::unique_ptr<jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>> upSudoku(new jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>);
 	long lGroupSet = 0;
+	{
+		std::ifstream ifs("sudoku.txt");
+
+		for (unsigned y = 0; y < 9; y++)
+		{
+			int n;
+			{
+				ifs >> n;
+				for (unsigned x = 0; x < 9; x++, n /= 10)
+				{
+					lGroupSet |= upSudoku->set(8 - x, y, n % 10);
+				}
+			}
+		}
+	}
 
 	for (;;)
 	{
