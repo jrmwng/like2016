@@ -89,6 +89,34 @@ namespace jrmwng
 			atOutput[k] = tAcc;
 		});
 	}
+	template <typename T, size_t uM, size_t uN>
+	void dct(T const (&aatInput)[uM][uN], T(&aatOutput)[uM][uN])
+	{
+		auto const & dctMatrixM = dct_matrix<T, uM>::g_Instance;
+		auto const & dctMatrixN = dct_matrix<T, uN>::g_Instance;
+
+		dct_for_each(std::make_index_sequence<uM>(), [&](auto const j)
+		{
+			dct_for_each(std::make_index_sequence<uN>(), [&](auto const k)
+			{
+				T tAcc0(0);
+				{
+					dct_for_each(std::make_index_sequence<uM>(), [&](auto const m)
+					{
+						T tAcc1(0);
+						{
+							dct_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+							{
+								tAcc1 += aatInput[m][n] * dctMatrixN[n][k];
+							});
+						}
+						tAcc0 += tAcc1 * dctMatrixM[m][j];
+					});
+				}
+				aatOutput[j][k] = tAcc0;
+			});
+		});
+	}
 	template <size_t uN4>
 	void dct(__m256d const (&alr4Input)[uN4], __m256d(&alr4Output)[uN4])
 	{
