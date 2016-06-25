@@ -11,21 +11,6 @@ namespace jrmwng
 {
 	namespace
 	{
-		template <typename T>
-		constexpr T accumulate(T t)
-		{
-			return t;
-		}
-		template <typename T, typename... Targs>
-		constexpr T accumulate(T t, Targs... tArgs)
-		{
-			return t + accumulate(tArgs...);
-		}
-		template <typename Tinteger, Tinteger... tInteger, typename Tfunc>
-		constexpr auto accumulate(std::integer_sequence<Tinteger, tInteger...>, Tfunc const & tFunc)
-		{
-			return accumulate(tFunc(std::integral_constant<Tinteger, tInteger>())...);
-		}
 		template <typename Tinteger, Tinteger... tInteger, typename Tfunc>
 		void for_each(std::integer_sequence<Tinteger, tInteger...>, Tfunc && tFunc)
 		{
@@ -33,14 +18,6 @@ namespace jrmwng
 			(void) type {
 				(std::forward<Tfunc>(tFunc)(std::integral_constant<Tinteger, tInteger>()), 0)...
 			};
-		}
-		template <typename Tinteger, Tinteger... tInteger, typename T, typename Tfunc>
-		void transform(std::integer_sequence<Tinteger, tInteger...> tSeq, T(&atOutput)[sizeof...(tInteger)], Tfunc && tFunc)
-		{
-			for_each(tSeq, [&](auto const tN)
-			{
-				atOutput[tN] = std::forward<Tfunc>(tFunc)(tN);
-			});
 		}
 		double dct_cos(double lr)
 		{
