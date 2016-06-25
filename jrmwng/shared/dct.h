@@ -95,7 +95,7 @@ namespace jrmwng
 		auto const & dctMatrixM = dct_matrix<T, uM>::g_Instance;
 		auto const & dctMatrixN = dct_matrix<T, uN>::g_Instance;
 
-		dct_for_each(std::make_index_sequence<uN>(), [&](auto const k)
+		for (unsigned k = 0; k < uN; k++)
 		{
 			T atAcc1[uM];
 			{
