@@ -8,6 +8,17 @@
 
 namespace jrmwng
 {
+	namespace
+	{
+		template <typename Tint, Tint... tInt, typename Tfunc>
+		sudoku_for_each(std::integer_sequence<Tint, tInt...>, Tfunc && tFunc)
+		{
+			using type = int [];
+			(void) type {
+				(std::forward<Tfunc>(tFunc)(std::integral_constant<Tint, tInt...>()), 0)...
+			};
+		}
+	}
 	struct sudoku_9x9_traits
 	{
 		enum
