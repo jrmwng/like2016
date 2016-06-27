@@ -166,9 +166,11 @@ namespace jrmwng
 						{
 							__m128i const xmmGroupMask = _mm_cmpeq_epi32(std::get<i.value>(axmmGroupSetABC), _mm_setzero_si128());
 
-							std::get<i.value>(axmmGroupSetABC) = _mm_xor_si128(std::get<i.value>(axmmGroupSetABC), std::get<i.value>(axmmGroupSet));
+							__m128i const xmmGroupSet = _mm_xor_si128(std::get<i.value>(axmmGroupSetABC), std::get<i.value>(axmmGroupSet));
 
 							int const nGroupMask = _mm_movemask_epi8(xmmGroupMask) & 0xFFF;
+
+							xmmGroupSet1 = _mm_or_si128(xmmGroupSet1, xmmGroupSet);
 
 							if (nGroupMask)
 							{
@@ -178,8 +180,6 @@ namespace jrmwng
 								});
 							}
 						});
-
-						xmmGroupSet1 = _mm_or_si128(_mm_or_si128(xmmGroupSet1, std::get<0>(axmmGroupSetABC)), _mm_or_si128(std::get<1>(axmmGroupSetABC), std::get<2>(axmmGroupSetABC)));
 					}
 					else // general case follows
 					{
