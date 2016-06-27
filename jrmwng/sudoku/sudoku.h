@@ -8,6 +8,17 @@
 
 namespace jrmwng
 {
+	namespace
+	{
+		template <typename Tint, Tint... tInt, typename Tfunc>
+		void sudoku_for_each(std::integer_sequence<Tint, tInt...>, Tfunc && tFunc)
+		{
+			using type = int [];
+			(void) type {
+				(std::forward<Tfunc>(tFunc)(std::integral_constant<Tint, tInt>()), 0)...
+			};
+		}
+	}
 	struct sudoku_9x9_traits
 	{
 		enum
@@ -75,62 +86,52 @@ namespace jrmwng
 					if (TT::SUDOKU_CANDIDATE_COUNT == 9)
 					{
 						long lGroupSet2 = 0;
-						__m128i xmmCandidateSet0;
-						__m128i xmmCandidateSet1;
-						__m128i xmmCandidateSet2;
-						__m128i xmmGroupSetA;
-						__m128i xmmGroupSetB;
-						__m128i xmmGroupSetC;
-						__m128i axmmGroupSet[3];
+						std::tuple<__m128i, __m128i, __m128i> axmmCandidateSet012;
+						std::tuple<__m128i, __m128i, __m128i> axmmGroupSetABC;
+						std::tuple<__m128i, __m128i, __m128i> axmmGroupSet;
+						std::tuple<__m128i, __m128i, __m128i> axmmCandidateSetABC;
 						{
-							__m128i axmmCandidateSet[3];
+							sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 							{
-								for (unsigned i = 0, j = 0; i < 3; i++, j += 3)
-								{
-									__m128i const xmmCandidateSet0 = _mm_unpacklo_epi16(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[j + 0]].lCandidateSet), 0));
-									__m128i const xmmCandidateSet1 = _mm_unpacklo_epi32(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[j + 1]].lCandidateSet), 0));
-									__m128i const xmmCandidateSet2 = _mm_unpacklo_epi64(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[j + 2]].lCandidateSet), 0));
+								__m128i const xmmCandidateSet0 = _mm_unpacklo_epi16(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[i * 3 + 0]].lCandidateSet), 0));
+								__m128i const xmmCandidateSet1 = _mm_unpacklo_epi32(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[i * 3 + 1]].lCandidateSet), 0));
+								__m128i const xmmCandidateSet2 = _mm_unpacklo_epi64(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[i * 3 + 2]].lCandidateSet), 0));
 
-									axmmCandidateSet[i] = _mm_or_si128(_mm_or_si128(xmmCandidateSet0, xmmCandidateSet1), xmmCandidateSet2);
-									axmmGroupSet[i] = _mm_set_epi32(0, astNumber[stGroup.alNumberIndex[j + 2]].lGroupSet, astNumber[stGroup.alNumberIndex[j + 1]].lGroupSet, astNumber[stGroup.alNumberIndex[j + 0]].lGroupSet);
-								}
-							}
-							xmmCandidateSet0 = axmmCandidateSet[0];
-							xmmCandidateSet1 = axmmCandidateSet[1];
-							xmmCandidateSet2 = axmmCandidateSet[2];
-							xmmGroupSetA = axmmGroupSet[0];
-							xmmGroupSetB = axmmGroupSet[1];
-							xmmGroupSetC = axmmGroupSet[2];
+								__m128i const xmmCandidateSet012 = _mm_or_si128(_mm_or_si128(xmmCandidateSet0, xmmCandidateSet1), xmmCandidateSet2);
+								__m128i const xmmGroupSet = _mm_set_epi32(0, astNumber[stGroup.alNumberIndex[i * 3 + 2]].lGroupSet, astNumber[stGroup.alNumberIndex[i * 3 + 1]].lGroupSet, astNumber[stGroup.alNumberIndex[i * 3 + 0]].lGroupSet);
+
+								std::get<i.value>(axmmCandidateSet012) = xmmCandidateSet012;
+								std::get<i.value>(axmmGroupSet) = xmmGroupSet;
+								std::get<i.value>(axmmGroupSetABC) = xmmGroupSet;
+								std::get<i.value>(axmmCandidateSetABC) = _mm_and_si128(_mm_shufflelo_epi16(xmmCandidateSet012, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
+							});
 						}
-						__m128i xmmCandidateSetA = _mm_and_si128(_mm_shufflelo_epi16(xmmCandidateSet0, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
-						__m128i xmmCandidateSetB = _mm_and_si128(_mm_shufflelo_epi16(xmmCandidateSet1, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
-						__m128i xmmCandidateSetC = _mm_and_si128(_mm_shufflelo_epi16(xmmCandidateSet2, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
 
-						for (long lNumberSet2 = 0; lNumberSet2 < (1 << TT::SUDOKU_CANDIDATE_COUNT); lNumberSet2 += (1 << 6), xmmCandidateSet2 = _mm_alignr_epi8(xmmCandidateSet2, xmmCandidateSet2, 2))
+						for (long lNumberSet2 = 0; lNumberSet2 < (1 << TT::SUDOKU_CANDIDATE_COUNT); lNumberSet2 += (1 << 6), std::get<2>(axmmCandidateSet012) = _mm_alignr_epi8(std::get<2>(axmmCandidateSet012), std::get<2>(axmmCandidateSet012), 2))
 						{
-							long const lCandidateSet2 = _mm_extract_epi16(xmmCandidateSet2, 0);
+							long const lCandidateSet2 = _mm_extract_epi16(std::get<2>(axmmCandidateSet012), 0);
 							unsigned const uMinCntNumber2 = __popcnt(lNumberSet2);
 							unsigned const uMaxCntNumber2 = __popcnt(lNumberSet2) + 6;
 							unsigned const uMinCntCandidate2 = __popcnt(lCandidateSet2);
-							unsigned const uMaxCntCandidate2 = __popcnt(lCandidateSet2 | _mm_extract_epi16(_mm_or_si128(xmmCandidateSet1, xmmCandidateSet0), 7));
+							unsigned const uMaxCntCandidate2 = __popcnt(lCandidateSet2 | _mm_extract_epi16(_mm_or_si128(std::get<1>(axmmCandidateSet012), std::get<0>(axmmCandidateSet012)), 7));
 
 							if (uMinCntCandidate2 <= uMaxCntNumber2 &&
 								uMinCntNumber2 <= uMaxCntCandidate2)
 							{
-								for (long lNumberSet1 = lNumberSet2; lNumberSet1 < lNumberSet2 + (1 << 6); lNumberSet1 += (1 << 3), xmmCandidateSet1 = _mm_alignr_epi8(xmmCandidateSet1, xmmCandidateSet1, 2))
+								for (long lNumberSet1 = lNumberSet2; lNumberSet1 < lNumberSet2 + (1 << 6); lNumberSet1 += (1 << 3), std::get<1>(axmmCandidateSet012) = _mm_alignr_epi8(std::get<1>(axmmCandidateSet012), std::get<1>(axmmCandidateSet012), 2))
 								{
-									long const lCandidateSet1 = lCandidateSet2 | _mm_extract_epi16(xmmCandidateSet1, 0);
+									long const lCandidateSet1 = lCandidateSet2 | _mm_extract_epi16(std::get<1>(axmmCandidateSet012), 0);
 									unsigned const uMinCntNumber1 = __popcnt(lNumberSet1);
 									unsigned const uMaxCntNumber1 = __popcnt(lNumberSet1) + 3;
 									unsigned const uMinCntCandidate1 = __popcnt(lCandidateSet1);
-									unsigned const uMaxCntCandidate1 = __popcnt(lCandidateSet1 | _mm_extract_epi16(xmmCandidateSet0, 7));
+									unsigned const uMaxCntCandidate1 = __popcnt(lCandidateSet1 | _mm_extract_epi16(std::get<0>(axmmCandidateSet012), 7));
 
 									if (uMinCntCandidate1 <= uMaxCntNumber1 &&
 										uMinCntNumber1 <= uMaxCntCandidate1)
 									{
-										for (long lNumberSet0 = lNumberSet1; lNumberSet0 < lNumberSet1 + (1 << 3); lNumberSet0++, xmmCandidateSet0 = _mm_alignr_epi8(xmmCandidateSet0, xmmCandidateSet0, 2))
+										for (long lNumberSet0 = lNumberSet1; lNumberSet0 < lNumberSet1 + (1 << 3); lNumberSet0++, std::get<0>(axmmCandidateSet012) = _mm_alignr_epi8(std::get<0>(axmmCandidateSet012), std::get<0>(axmmCandidateSet012), 2))
 										{
-											long const lCandidateSet0 = lCandidateSet1 | _mm_extract_epi16(xmmCandidateSet0, 0);
+											long const lCandidateSet0 = lCandidateSet1 | _mm_extract_epi16(std::get<0>(axmmCandidateSet012), 0);
 											unsigned const uPopCntNumber0 = __popcnt(lNumberSet0);
 											unsigned const uPopCntCandidate0 = __popcnt(lCandidateSet0);
 
@@ -139,68 +140,46 @@ namespace jrmwng
 
 											if (uPopCntCandidate0 == uPopCntNumber0)
 											{
-												__m128i const xmmNotNumberBitA = _mm_andnot_si128(xmmNumberSet, _mm_set_epi32(0, 0x004, 0x002, 0x001));
-												__m128i const xmmNotNumberBitB = _mm_andnot_si128(xmmNumberSet, _mm_set_epi32(0, 0x020, 0x010, 0x008));
-												__m128i const xmmNotNumberBitC = _mm_andnot_si128(xmmNumberSet, _mm_set_epi32(0, 0x100, 0x080, 0x040));
+												sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
+												{
+													__m128i const xmmNotNumberBit = _mm_andnot_si128(xmmNumberSet, _mm_set_epi32(0, (0x004 << (i * 3)), (0x002 << (i * 3)), (0x001 << (i * 3))));
 
-												__m128i const xmmNotNumberNullA = _mm_cmpeq_epi32(xmmNotNumberBitA, _mm_setzero_si128());
-												__m128i const xmmNotNumberNullB = _mm_cmpeq_epi32(xmmNotNumberBitB, _mm_setzero_si128());
-												__m128i const xmmNotNumberNullC = _mm_cmpeq_epi32(xmmNotNumberBitC, _mm_setzero_si128());
+													__m128i const xmmNotNumberNull = _mm_cmpeq_epi32(xmmNotNumberBit, _mm_setzero_si128());
 
-												__m128i const xmmCandidateClearA = _mm_andnot_si128(xmmNotNumberNullA, xmmCandidateSet);
-												__m128i const xmmCandidateClearB = _mm_andnot_si128(xmmNotNumberNullB, xmmCandidateSet);
-												__m128i const xmmCandidateClearC = _mm_andnot_si128(xmmNotNumberNullC, xmmCandidateSet);
+													__m128i const xmmCandidateClear = _mm_andnot_si128(xmmNotNumberNull, xmmCandidateSet);
 
-												__m128i const xmmCandidateNewA = _mm_andnot_si128(xmmCandidateClearA, xmmCandidateSetA);
-												__m128i const xmmCandidateNewB = _mm_andnot_si128(xmmCandidateClearB, xmmCandidateSetB);
-												__m128i const xmmCandidateNewC = _mm_andnot_si128(xmmCandidateClearC, xmmCandidateSetC);
+													__m128i const xmmCandidateNew = _mm_andnot_si128(xmmCandidateClear, std::get<i.value>(axmmCandidateSetABC));
 
-												__m128i const xmmCandidateSameA = _mm_cmpeq_epi32(xmmCandidateSetA, xmmCandidateNewA);
-												__m128i const xmmCandidateSameB = _mm_cmpeq_epi32(xmmCandidateSetB, xmmCandidateNewB);
-												__m128i const xmmCandidateSameC = _mm_cmpeq_epi32(xmmCandidateSetC, xmmCandidateNewC);
+													__m128i const xmmCandidateSame = _mm_cmpeq_epi32(std::get<i.value>(axmmCandidateSetABC), xmmCandidateNew);
 
-												xmmCandidateSetA = xmmCandidateNewA;
-												xmmCandidateSetB = xmmCandidateNewB;
-												xmmCandidateSetC = xmmCandidateNewC;
-												xmmGroupSetA = _mm_and_si128(xmmCandidateSameA, xmmGroupSetA);
-												xmmGroupSetB = _mm_and_si128(xmmCandidateSameB, xmmGroupSetB);
-												xmmGroupSetC = _mm_and_si128(xmmCandidateSameC, xmmGroupSetC);
+													std::get<i.value>(axmmCandidateSetABC) = xmmCandidateNew;
+
+													std::get<i.value>(axmmGroupSetABC) = _mm_and_si128(xmmCandidateSame, std::get<i.value>(axmmGroupSetABC));
+												});
 											}
 										}
 									}
 								}
 							}
 						}
-						__m128i const xmmGroupMaskA = _mm_cmpeq_epi32(xmmGroupSetA, _mm_setzero_si128());
-						__m128i const xmmGroupMaskB = _mm_cmpeq_epi32(xmmGroupSetB, _mm_setzero_si128());
-						__m128i const xmmGroupMaskC = _mm_cmpeq_epi32(xmmGroupSetC, _mm_setzero_si128());
-
-						xmmGroupSetA = _mm_xor_si128(xmmGroupSetA, axmmGroupSet[0]);
-						xmmGroupSetB = _mm_xor_si128(xmmGroupSetB, axmmGroupSet[1]);
-						xmmGroupSetC = _mm_xor_si128(xmmGroupSetC, axmmGroupSet[2]);
-
-						int anGroupMask[3];
-						__m128i axmmCandidateSet[3];
+						sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 						{
-							anGroupMask[0] = _mm_movemask_epi8(xmmGroupMaskA) & 0xFFF;
-							anGroupMask[1] = _mm_movemask_epi8(xmmGroupMaskB) & 0xFFF;
-							anGroupMask[2] = _mm_movemask_epi8(xmmGroupMaskC) & 0xFFF;
-							axmmCandidateSet[0] = xmmCandidateSetA;
-							axmmCandidateSet[1] = xmmCandidateSetB;
-							axmmCandidateSet[2] = xmmCandidateSetC;
-						}
-						for (unsigned i = 0; i < std::size(anGroupMask); i++)
-						{
-							if (anGroupMask[i])
+							__m128i const xmmGroupMask = _mm_cmpeq_epi32(std::get<i.value>(axmmGroupSetABC), _mm_setzero_si128());
+
+							__m128i const xmmGroupSet = _mm_xor_si128(std::get<i.value>(axmmGroupSetABC), std::get<i.value>(axmmGroupSet));
+
+							int const nGroupMask = _mm_movemask_epi8(xmmGroupMask) & 0xFFF;
+
+							xmmGroupSet1 = _mm_or_si128(xmmGroupSet1, xmmGroupSet);
+
+							if (nGroupMask)
 							{
-								for (unsigned j = 0; j < 3; j++)
+								sudoku_for_each(std::make_index_sequence<3>(), [&](auto const j)
 								{
-									astNumber[stGroup.alNumberIndex[j + i * 3]].lCandidateSet = axmmCandidateSet[i].m128i_i32[j];
-								}
+									astNumber[stGroup.alNumberIndex[i * 3 + j]].lCandidateSet = _mm_extract_epi32(std::get<i.value>(axmmCandidateSetABC), j.value);
+								});
 							}
-						}
-
-						xmmGroupSet1 = _mm_or_si128(_mm_or_si128(xmmGroupSet1, xmmGroupSetA), _mm_or_si128(xmmGroupSetB, xmmGroupSetC));
+						});
 					}
 					else // general case follows
 					{

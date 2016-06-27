@@ -4,7 +4,9 @@
 #include "sudoku.h"
 
 #include <iostream>
+#include <fstream>
 #include <memory>
+#include <chrono>
 
 std::ostream & operator<< (std::ostream & os, jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>::number_t const & stSudokuNumber)
 {
@@ -52,6 +54,21 @@ int main()
 {
 	std::unique_ptr<jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>> upSudoku(new jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>);
 	long lGroupSet = 0;
+	{
+		std::ifstream ifs("sudoku.txt");
+
+		for (unsigned y = 0; y < 9; y++)
+		{
+			int n;
+			{
+				ifs >> n;
+				for (unsigned x = 0; x < 9; x++, n /= 10)
+				{
+					lGroupSet |= upSudoku->set(8 - x, y, n % 10);
+				}
+			}
+		}
+	}
 
 	for (;;)
 	{
@@ -78,11 +95,14 @@ int main()
 		if (c == 'p') // peek
 		{
 			auto stSudoku = *upSudoku;
+			auto tp0 = std::chrono::steady_clock::now();
 			unsigned long long uxl0 = __rdtsc();
 			stSudoku.update(lGroupSet);
 			unsigned long long uxl1 = __rdtsc();
+			auto tp1 = std::chrono::steady_clock::now();
 			std::cout << stSudoku;
 			std::cout << uxl1 - uxl0 << " cycles" << std::endl;
+			std::cout << std::chrono::duration_cast<std::chrono::microseconds>(tp1 - tp0).count() << "us" << std::endl;
 		}
 		if (c == 'r') // reset
 		{
