@@ -103,7 +103,7 @@ namespace jrmwng
 								std::get<i.value>(axmmCandidateSet012) = xmmCandidateSet012;
 								std::get<i.value>(axmmGroupSet) = xmmGroupSet;
 								std::get<i.value>(axmmGroupSetABC) = xmmGroupSet;
-								std::get<i.value>(axmmCandidateSetABC) = _mm_and_si128(_mm_shufflelo_epi16(std::get<i.value>(axmmCandidateSet012), _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
+								std::get<i.value>(axmmCandidateSetABC) = _mm_and_si128(_mm_shufflelo_epi16(xmmCandidateSet012, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
 							});
 						}
 
