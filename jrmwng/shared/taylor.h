@@ -25,7 +25,7 @@ namespace jrmwng
 	namespace taylor
 	{
 		template <typename Tinteger, Tinteger... tInteger, typename Tfunc>
-		void taylor_for_each(std::integer_sequence<Tinteger, tInteger...>, Tfunc && tFunc)
+		void for_each(std::integer_sequence<Tinteger, tInteger...>, Tfunc && tFunc)
 		{
 			using type = int [];
 			(void) type {
@@ -40,7 +40,7 @@ namespace jrmwng
 			{
 				T tProduct(1);
 				{
-					taylor_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					for_each(std::make_index_sequence<uN>(), [&](auto const n)
 					{
 						tProduct *= t / T(n + 1);
 					});
@@ -52,7 +52,7 @@ namespace jrmwng
 			{
 				T tSum(0);
 				{
-					taylor_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					for_each(std::make_index_sequence<uN>(), [&](auto const n)
 					{
 						tSum += taylor_function<n>::eval(tA) * power_to_factorial<n, T>(tX - tA);
 					});
@@ -64,7 +64,7 @@ namespace jrmwng
 			{
 				T tSum(0);
 				{
-					taylor_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					for_each(std::make_index_sequence<uN>(), [&](auto const n)
 					{
 						tSum += taylor_function<n>::eval_t<nA>::value * power_to_factorial<n, T>(tX - nA);
 					});
