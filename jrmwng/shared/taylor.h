@@ -59,7 +59,7 @@ namespace jrmwng
 				{
 					taylor_for_each(std::make_index_sequence<uN>(), [&](auto const n)
 					{
-						tSum += taylor_function<n>::eval(tA) * power_to_factorial<n, T>(tX - tA);
+						tSum += taylor_function<n.value>::eval(tA) * power_to_factorial<n.value, T>(tX - tA);
 					});
 				}
 				return tSum;
@@ -77,20 +77,22 @@ namespace jrmwng
 				return tSum;
 			}
 		};
-
-		template <template <size_t uN> class taylor_function, size_t uN, typename T>
-		T taylor_eval(T tX, T tA)
-		{
-			return taylor_traits::eval<taylor_function, uN>(tX, tA);
-		}
-		template <template <size_t uN> class taylor_function, size_t uN, intmax_t nA, typename T>
-		T taylor_eval(T tX)
-		{
-			return taylor_traits::eval<taylor_function, uN, nA>(tX);
-		}
+	}
+	template <template <size_t uN> class taylor_function, size_t uN, typename T>
+	T taylor_eval(T tX, T tA)
+	{
+		return taylor_traits::eval<taylor_function, uN>(tX, tA);
+	}
+	template <template <size_t uN> class taylor_function, size_t uN, intmax_t nA, typename T>
+	T taylor_eval(T tX)
+	{
+		return taylor_traits::eval<taylor_function, uN, nA>(tX);
+	}
 
 		//
 
+	namespace taylor
+	{
 		template <typename Ttraits>
 		struct taylor_negative_traits;
 
@@ -119,7 +121,7 @@ namespace jrmwng
 		{
 			template <size_t uNth>
 			using derivative_t =
-				std::conditional_t<(uNth % 4 == 1), taylor_cos_traits, 
+				std::conditional_t<(uNth % 4 == 1), taylor_cos_traits,
 				std::conditional_t<(uNth % 4 == 2), taylor_negative_traits<taylor_sin_traits>,
 				std::conditional_t<(uNth % 4 == 3), taylor_negative_traits<taylor_cos_traits>,
 				taylor_sin_traits>>>;
@@ -159,15 +161,15 @@ namespace jrmwng
 				return taylor_eval<derivative_t, uN, 0>(tX);
 			}
 		};
-		template <size_t uN, typename T>
-		T taylor_sin(T tX)
-		{
-			return taylor_sin_traits::eval<uN>(tX);
-		}
-		template <size_t uN, typename T>
-		T taylor_cos(T tX)
-		{
-			return taylor_cos_traits::eval<uN>(tX);
-		}
+	}
+	template <size_t uN, typename T>
+	T taylor_sin(T tX)
+	{
+		return taylor_sin_traits::eval<uN>(tX);
+	}
+	template <size_t uN, typename T>
+	T taylor_cos(T tX)
+	{
+		return taylor_cos_traits::eval<uN>(tX);
 	}
 }
