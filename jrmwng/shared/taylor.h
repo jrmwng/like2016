@@ -32,6 +32,11 @@ namespace jrmwng
 				(std::forward<Tfunc>(tFunc)(std::integral_constant<Tinteger, tInteger>()), 0)...
 			};
 		}
+		template <typename Tinteger, typename Tfunc>
+		void for_each(std::integer_sequence<Tinteger>, Tfunc && tFunc)
+		{
+			// NOP
+		}
 
 		struct taylor_traits
 		{
@@ -66,7 +71,7 @@ namespace jrmwng
 				{
 					for_each(std::make_index_sequence<uN>(), [&](auto const n)
 					{
-						tSum += taylor_function<n>::eval_t<nA>::value * power_to_factorial<n, T>(tX - nA);
+						tSum += taylor_function<n.value>::eval_t<nA>::value * power_to_factorial<n.value, T>(tX - nA);
 					});
 				}
 				return tSum;
@@ -86,13 +91,38 @@ namespace jrmwng
 
 		//
 
+		template <typename Ttraits>
+		struct taylor_negative_traits;
+
+		template <typename Ttraits>
+		struct taylor_negative_traits
+		{
+			template <size_t uNth>
+			using derivative_t = taylor_negative_traits<typename Ttraits::template derivative_t<uNth>>;
+
+			template <intmax_t nX>
+			struct eval_t
+				: std::integral_constant<intmax_t, -Ttraits::template eval_t<nX>::value>
+			{};
+
+			template <size_t uN, typename T>
+			static T eval(T tX)
+			{
+				return -Ttraits::eval<uN, T>(tX);
+			}
+		};
+
 		struct taylor_sin_traits;
 		struct taylor_cos_traits;
 
 		struct taylor_sin_traits
 		{
 			template <size_t uNth>
-			using derivative_t = std::conditional_t<(uNth % 2), taylor_cos_traits, taylor_sin_traits>;
+			using derivative_t =
+				std::conditional_t<(uNth % 4 == 1), taylor_cos_traits, 
+				std::conditional_t<(uNth % 4 == 2), taylor_negative_traits<taylor_sin_traits>,
+				std::conditional_t<(uNth % 4 == 3), taylor_negative_traits<taylor_cos_traits>,
+				taylor_sin_traits>>>;
 
 			template <intmax_t nX>
 			struct eval_t;
@@ -110,7 +140,11 @@ namespace jrmwng
 		struct taylor_cos_traits
 		{
 			template <size_t uNth>
-			using derivative_t = std::conditional_t<(uNth % 2), taylor_sin_traits, taylor_cos_traits>;
+			using derivative_t =
+				std::conditional_t<(uNth % 4 == 1), taylor_negative_traits<taylor_sin_traits>,
+				std::conditional_t<(uNth % 4 == 2), taylor_negative_traits<taylor_cos_traits>,
+				std::conditional_t<(uNth % 4 == 3), taylor_sin_traits,
+				taylor_cos_traits>>>;
 
 			template <intmax_t nX>
 			struct eval_t;
