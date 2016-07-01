@@ -86,14 +86,14 @@ namespace jrmwng
 
 		//
 
-		template <size_t uNth>
 		struct taylor_sin_traits;
-		template <size_t uNth>
 		struct taylor_cos_traits;
 
-		template <>
-		struct taylor_sin_traits<0>
+		struct taylor_sin_traits
 		{
+			template <size_t uNth>
+			using derivative_t = std::conditional_t<(uNth % 2), taylor_cos_traits, taylor_sin_traits>;
+
 			template <intmax_t nX>
 			struct eval_t;
 			template <>
@@ -104,12 +104,14 @@ namespace jrmwng
 			template <size_t uN, typename T>
 			static T eval(T tX)
 			{
-				return taylor_eval<taylor_sin_traits, uN, 0>(tX);
+				return taylor_eval<derivative_t, uN, 0>(tX);
 			}
 		};
-		template <>
-		struct taylor_cos_traits<0>
+		struct taylor_cos_traits
 		{
+			template <size_t uNth>
+			using derivative_t = std::conditional_t<(uNth % 2), taylor_sin_traits, taylor_cos_traits>;
+
 			template <intmax_t nX>
 			struct eval_t;
 			template <>
@@ -120,26 +122,18 @@ namespace jrmwng
 			template <size_t uN, typename T>
 			static T eval(T tX)
 			{
-				return taylor_eval<taylor_cos_traits, uN, 0>(tX);
+				return taylor_eval<derivative_t, uN, 0>(tX);
 			}
 		};
-		template <size_t uNth>
-		struct taylor_sin_traits
-			: std::conditional_t<(uNth % 2), taylor_cos_traits<0>, taylor_sin_traits<0>>
-		{};
-		template <size_t uNth>
-		struct taylor_cos_traits
-			: std::conditional_t<(uNth % 2), taylor_sin_traits<0>, taylor_cos_traits<0>>
-		{};
 		template <size_t uN, typename T>
 		T taylor_sin(T tX)
 		{
-			return taylor_sin_traits<0>::eval<uN>(tX);
+			return taylor_sin_traits::eval<uN>(tX);
 		}
 		template <size_t uN, typename T>
 		T taylor_cos(T tX)
 		{
-			return taylor_cos_traits<0>::eval<uN>(tX);
+			return taylor_cos_traits::eval<uN>(tX);
 		}
 	}
 }
