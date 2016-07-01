@@ -66,12 +66,27 @@ namespace jrmwng
 		template <typename T1, typename T2>
 		auto operator * (T1 const & t1, Mop<std::negate, T2> const & t2)
 		{
-			return -(Mop<std::multiplies, T1, T2>(t1, get<0>(t2));
+			return -(Mop<std::multiplies, T1, T2>(t1, get<0>(t2)));
 		}
 		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
 		auto operator * (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::multiplies, T1, T2>(t1, t2);
+		}
+		template <typename T1, typename T2>
+		auto operator / (Mop<std::negate, T1> const & t1, Mop<std::negate, T2> const & t2)
+		{
+			return Mop<std::divides, T1, T2>(get<0>(t1), get<0>(t2));
+		}
+		template <typename T1, typename T2>
+		auto operator / (Mop<std::negate, T1> const & t1, T2 const & t2)
+		{
+			return -(Mop<std::divides, T1, T2>(get<0>(t1), t2));
+		}
+		template <typename T1, typename T2>
+		auto operator / (T1 const & t1, Mop<std::negate, T2> const & t2)
+		{
+			return -(Mop<std::divides, T1, T2>(t1, get<0>(t2)));
 		}
 		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
 		auto operator / (T1 const & t1, T2 const & t2)
@@ -114,6 +129,7 @@ namespace jrmwng
 
 		template <typename Tmm, typename T>
 		struct Mvar
+			: Mexpr
 		{
 			Tmm m_mmValue;
 
@@ -131,28 +147,60 @@ namespace jrmwng
 
 			template <typename T1, typename T2>
 			Mvar(Mop<std::plus, T1, Mop<std::negate, T2>> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::minus(Mvar(get<0>(tOp)), Mvar(get<0>(get<1>(tOp)))))
+				: m_mmValue(Mtraits<Tmm, T>::minus(Mvar(get<0>(tOp)).m_mmValue, Mvar(get<0>(get<1>(tOp))).m_mmValue))
 			{}
 			template <typename T1, typename T2>
 			Mvar(Mop<std::plus, T1, T2> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::plus(Mvar(get<0>(tOp)), Mvar(get<1>(tOp))))
+				: m_mmValue(Mtraits<Tmm, T>::plus(Mvar(get<0>(tOp)).m_mmValue, Mvar(get<1>(tOp)).m_mmValue))
 			{}
 			template <typename T1, typename T2>
 			Mvar(Mop<std::minus, T1, Mop<std::negate, T2>> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::plus(Mvar(get<0>(tOp)), mVar(get<0>(get<1>(tOp)))))
+				: m_mmValue(Mtraits<Tmm, T>::plus(Mvar(get<0>(tOp)).m_mmValue, Mvar(get<0>(get<1>(tOp))).m_mmValue))
 			{}
 			template <typename T1, typename T2>
 			Mvar(Mop<std::minus, T1, T2> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::minus(Mvar(get<0>(tOp)), Mvar(get<1>(tOp))))
+				: m_mmValue(Mtraits<Tmm, T>::minus(Mvar(get<0>(tOp)).m_mmValue, Mvar(get<1>(tOp)).m_mmValue))
 			{}
 			template <typename T1, typename T2>
 			Mvar(Mop<std::multiplies, T1, T2> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::multiplies(Mvar(get<0>(tOp)), Mvar(get<1>(tOp))))
+				: m_mmValue(Mtraits<Tmm, T>::multiplies(Mvar(get<0>(tOp)).m_mmValue, Mvar(get<1>(tOp)).m_mmValue))
 			{}
 			template <typename T1, typename T2>
 			Mvar(Mop<std::divides, T1, T2> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::divides(Mvar(get<0>(tOp)), Mvar(get<1>(tOp))))
+				: m_mmValue(Mtraits<Tmm, T>::divides(Mvar(get<0>(tOp)).m_mmValue, Mvar(get<1>(tOp)).m_mmValue))
 			{}
+
+			template <typename T1>
+			Mvar & operator = (T1 const & t1)
+			{
+				m_mmValue = Mvar(t1).m_mmValue;
+				return *this;
+			}
+
+			template <typename T1>
+			Mvar & operator += (T1 const & t1)
+			{
+				m_mmValue = Mvar(*this + t1).m_mmValue;
+				return *this;
+			}
+			template <typename T1>
+			Mvar & operator -= (T1 const & t1)
+			{
+				m_mmValue = Mvar(*this - t1).m_mmValue;
+				return *this;
+			}
+			template <typename T1>
+			Mvar & operator *= (T1 const & t1)
+			{
+				m_mmValue = Mvar(*this * t1).m_mmValue;
+				return *this;
+			}
+			template <typename T1>
+			Mvar & operator /= (T1 const & t1)
+			{
+				m_mmValue = Mvar(*this / t1).m_mmValue;
+				return *this;
+			}
 		};
 	}
 }
