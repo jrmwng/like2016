@@ -13,7 +13,7 @@ namespace UnitTest_taylor
 		
 		TEST_METHOD(TestMethod_taylor)
 		{
-			using namespace jrmwng::taylor;
+			using namespace jrmwng;
 
 			double lrSin90 = taylor_sin<8>(acos(0));
 
