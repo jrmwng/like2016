@@ -24,69 +24,65 @@ namespace jrmwng
 	// f(x) = f(x-0.5) + [f'(x-0.5) / 1! * 0.5] + [f''(x-0.5) / 2! * 0.5^2] + [f'''(x-0.5) / 3! * 0.5^3] + ...
 	namespace taylor
 	{
-		template <size_t uN>
-		struct taylor_traits;
-		template <>
-		struct taylor_traits<0>
+		template <typename Tinteger, Tinteger... tInteger, typename Tfunc>
+		void for_each(std::integer_sequence<Tinteger, tInteger...>, Tfunc && tFunc)
 		{
-			template <typename T>
-			static T power_to_factorial(T t)
-			{
-				return T(1);
-			}
-			template <template <size_t uNth> class taylor_function, typename T>
-			static T eval(T tX, T tA)
-			{
-				return taylor_function<0>::eval(tA);
-			}
-			template <template <size_t uNth> class taylor_function, typename T, intmax_t nA>
-			static T eval(T tX)
-			{
-				return taylor_function<0>::eval_t<nA>::value;
-			}
+			using type = int [];
+			(void) type {
+				(std::forward<Tfunc>(tFunc)(std::integral_constant<Tinteger, tInteger>()), 0)...
+			};
+		}
 
-			template <intmax_t nExpr>
-			using power_to_factorial_t = std::ratio<0, 0>;
-			template <template <size_t uNth> class taylor_function, intmax_t nA, intmax_t nX>
-			using eval_t = taylor_function<0>::eval_t<nA>;
-		};
-		template <size_t uN>
 		struct taylor_traits
 		{
-			template <typename T>
+			template <size_t uN, typename T>
 			static T power_to_factorial(T t)
 			{
-				return (t / T(uN)) * taylor_traits<uN - 1>::power_to_factorial(t);
+				T tProduct(1);
+				{
+					for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					{
+						tProduct *= t / T(n + 1);
+					});
+				}
+				return tProduct;
 			}
-			template <template <size_t uNth> class taylor_function, typename T>
+			template <template <size_t uNth> class taylor_function, size_t uN, typename T>
 			static T eval(T tX, T tA)
 			{
-				return taylor_function<uN>::eval(tA) * power_to_factorial<T>(tX - tA) + taylor_traits<uN - 1>::eval<taylor_function>(tX, tA);
+				T tSum(0);
+				{
+					for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					{
+						tSum += taylor_function<n>::eval(tA) * power_to_factorial<n, T>(tX - tA);
+					});
+				}
+				return tSum;
 			}
-			template <template <size_t uNth> class taylor_function, intmax_t nA, typename T>
+			template <template <size_t uNth> class taylor_function, size_t uN, intmax_t nA, typename T>
 			static T eval(T tX)
 			{
-				return taylor_function<uN>::eval_t<nA>::value * power_to_factorial<T>(tX - nA) + taylor_traits<uN - 1>::eval<taylor_function, nA>(tX);
+				T tSum(0);
+				{
+					for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					{
+						tSum += taylor_function<n>::eval_t<nA>::value * power_to_factorial<n, T>(tX - nA);
+					});
+				}
+				return tSum;
 			}
-
-			template <intmax_t nExpr>
-			using power_to_factorial_t = typename std::ratio_multiply<std::ratio<nExpr, uN>, taylor_traits<uN - 1>::power_to_factorial_t<nExpr>>::type;
-			template <template <size_t uNth> class tayloer_function, intmax_t nA, intmax_t nX>
-			using eval_t = typename std::ratio_add<typename std::ratio_multiply<taylor_function<uN>::eval_t<nA>, power_to_factorial_t<nX - nA>>::type, taylor_traits<uN - 1>::eval_t>::type;
 		};
 
 		template <template <size_t uN> class taylor_function, size_t uN, typename T>
 		T taylor_eval(T tX, T tA)
 		{
-			return taylor_traits<uN>::eval<taylor_function>(tX, tA);
+			return taylor_traits::eval<taylor_function, uN>(tX, tA);
 		}
 		template <template <size_t uN> class taylor_function, size_t uN, intmax_t nA, typename T>
 		T taylor_eval(T tX)
 		{
-			return taylor_traits<uN>::eval<taylor_function, nA>(tX);
+			return taylor_traits::eval<taylor_function, uN, nA>(tX);
 		}
-		template <template <size_t uNth> class taylor_function, size_t uN, intmax_t nA, intmax_t nX>
-		using taylor_eval_t = taylor_traits<uN>::eval_t<taylor_function, nA, nX>;
 
 		//
 
@@ -108,7 +104,7 @@ namespace jrmwng
 			template <size_t uN, typename T>
 			static T eval(T tX)
 			{
-				return taylor_traits<uN>::eval<taylor_sin_traits, 0>(tX);
+				return taylor_eval<taylor_sin_traits, uN, 0>(tX);
 			}
 		};
 		template <>
@@ -124,7 +120,7 @@ namespace jrmwng
 			template <size_t uN, typename T>
 			static T eval(T tX)
 			{
-				return taylor_traits<uN>::eval<taylor_cos_traits, 0>(tX);
+				return taylor_eval<taylor_cos_traits, uN, 0>(tX);
 			}
 		};
 		template <size_t uNth>
