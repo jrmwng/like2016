@@ -3,7 +3,6 @@
 /* Author: jrmwng @ 2016 */
 
 #include <type_traits>
-#include <ratio>
 
 namespace jrmwng
 {
@@ -64,7 +63,7 @@ namespace jrmwng
 				}
 				return tSum;
 			}
-			template <template <size_t uNth> class taylor_function, size_t uN, intmax_t nA, typename T>
+			template <template <size_t uNth> class taylor_function, size_t uN, int nA, typename T>
 			static T eval(T tX)
 			{
 				T tSum(0);
@@ -83,7 +82,7 @@ namespace jrmwng
 	{
 		return taylor_traits::eval<taylor_function, uN>(tX, tA);
 	}
-	template <template <size_t uN> class taylor_function, size_t uN, intmax_t nA, typename T>
+	template <template <size_t uN> class taylor_function, size_t uN, int nA, typename T>
 	T taylor_eval(T tX)
 	{
 		return taylor_traits::eval<taylor_function, uN, nA>(tX);
@@ -102,9 +101,9 @@ namespace jrmwng
 			template <size_t uNth>
 			using derivative_t = taylor_negative_traits<typename Ttraits::template derivative_t<uNth>>;
 
-			template <intmax_t nX>
+			template <int nX>
 			struct eval_t
-				: std::integral_constant<intmax_t, -Ttraits::template eval_t<nX>::value>
+				: std::integral_constant<int, -Ttraits::template eval_t<nX>::value>
 			{};
 
 			template <size_t uN, typename T>
@@ -137,11 +136,11 @@ namespace jrmwng
 			template <size_t uNth>
 			using derivative_t = taylor_switch_t<(uNth % 4), taylor_sin_traits, taylor_cos_traits, taylor_negative_traits<taylor_sin_traits>, taylor_negative_traits<taylor_cos_traits>>;
 
-			template <intmax_t nX>
+			template <int nX>
 			struct eval_t;
 			template <>
 			struct eval_t<0>
-				: std::integral_constant<intmax_t, 0>
+				: std::integral_constant<int, 0>
 			{};
 
 			template <size_t uN, typename T>
@@ -155,11 +154,11 @@ namespace jrmwng
 			template <size_t uNth>
 			using derivative_t = taylor_switch_t<(uNth % 4), taylor_cos_traits, taylor_negative_traits<taylor_sin_traits>, taylor_negative_traits<taylor_cos_traits>, taylor_sin_traits>;
 
-			template <intmax_t nX>
+			template <int nX>
 			struct eval_t;
 			template <>
 			struct eval_t<0>
-				: std::integral_constant<intmax_t, 1>
+				: std::integral_constant<int, 1>
 			{};
 
 			template <size_t uN, typename T>
