@@ -63,7 +63,7 @@ namespace jrmwng
 		{
 			return Mop<std::minus, T1, T2>(t1, get<0>(t2));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator + (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::plus, T1, T2>(t1, t2);
@@ -83,7 +83,7 @@ namespace jrmwng
 		{
 			return Mop<std::plus, T1, T2>(t1, get<0>(t2));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator - (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::minus, T1, T2>(t1, t2);
@@ -103,7 +103,7 @@ namespace jrmwng
 		{
 			return -(Mop<std::multiplies, T1, T2>(t1, get<0>(t2)));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator * (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::multiplies, T1, T2>(t1, t2);
@@ -123,7 +123,7 @@ namespace jrmwng
 		{
 			return -(Mop<std::divides, T1, T2>(t1, get<0>(t2)));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator / (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::divides, T1, T2>(t1, t2);
