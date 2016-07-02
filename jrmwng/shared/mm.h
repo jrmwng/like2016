@@ -226,6 +226,50 @@ namespace jrmwng
 			}
 		};
 		template <>
+		struct Mtraits<__m256i, short>
+		{
+			static __m256i setzero()
+			{
+				return _mm256_setzero_si256();
+			}
+			static __m256i set1(short w)
+			{
+				return _mm256_set1_epi16(w);
+			}
+			static __m256i plus(__m256i const & w16A, __m256i const & w16B)
+			{
+				return _mm256_add_epi16(w16A, w16B);
+			}
+			static __m256i minus(__m256i const & w16A, __m256i const & w16B)
+			{
+				return _mm256_sub_epi16(w16A, w16B);
+			}
+			static __m256i multiplies(__m256i const & w16A, __m256i const & w16B)
+			{
+				return _mm256_mullo_epi16(w16A, w16B);
+			}
+			static __m256i divides(__m256i const & w16A, __m256i const & w16B)
+			{
+				__m128i const w8AL = _mm256_extracti128_si256(w16A, 0);
+				__m128i const w8AH = _mm256_extracti128_si256(w16A, 1);
+				__m128i const w8BL = _mm256_extracti128_si256(w16B, 0);
+				__m128i const w8BH = _mm256_extracti128_si256(w16B, 1);
+				__m256i const n8AL = _mm256_cvtepi16_epi32(w8AL);
+				__m256i const n8AH = _mm256_cvtepi16_epi32(w8AH);
+				__m256i const n8BL = _mm256_cvtepi16_epi32(w8BL);
+				__m256i const n8BH = _mm256_cvtepi16_epi32(w8BH);
+				__m256 const r8AL = _mm256_cvtepi32_ps(n8AL);
+				__m256 const r8AH = _mm256_cvtepi32_ps(n8AH);
+				__m256 const r8BL = _mm256_cvtepi32_ps(n8BL);
+				__m256 const r8BH = _mm256_cvtepi32_ps(n8BH);
+				__m256 const r8ALdivBL = _mm256_div_ps(r8AL, r8BL);
+				__m256 const r8AHdivBH = _mm256_div_ps(r8AH, r8BH);
+				__m256i const n4ALdivBL = _mm256_cvtps_epi32(r8ALdivBL);
+				__m256i const n4AHdivBH = _mm256_cvtps_epi32(r8AHdivBH);
+				return _mm256_packs_epi32(n4ALdivBL, n4AHdivBH);
+			}
+		};
+		template <>
 		struct Mtraits<__m128d, double>
 		{
 			static __m128d setzero()
@@ -279,6 +323,77 @@ namespace jrmwng
 			static __m128 divides(__m128 const & r4A, __m128 const & r4B)
 			{
 				return _mm_div_ps(r4A, r4B);
+			}
+		};
+		template <>
+		struct Mtraits<__m128i, int>
+		{
+			static __m128i setzero()
+			{
+				return _mm_setzero_si128();
+			}
+			static __m128i set1(int n)
+			{
+				return _mm_set1_epi32(n);
+			}
+			static __m128i plus(__m128i const & n4A, __m128i const & n4B)
+			{
+				return _mm_add_epi32(n4A, n4B);
+			}
+			static __m128i minus(__m128i const & n4A, __m128i const & n4B)
+			{
+				return _mm_sub_epi32(n4A, n4B);
+			}
+			static __m128i multiplies(__m128i const & n4A, __m128i const & n4B)
+			{
+				return _mm_mullo_epi32(n4A, n4B);
+			}
+			static __m128i divides(__m128i const & n4A, __m128i const & n4B)
+			{
+				__m128 const r4A = _mm_cvtepi32_ps(n4A);
+				__m128 const r4B = _mm_cvtepi32_ps(n4B);
+				__m128 const r4AdivB = _mm_div_ps(r4A, r4B);
+				return _mm_cvtps_epi32(r4AdivB);
+			}
+		};
+		template <>
+		struct Mtraits<__m128i, short>
+		{
+			static __m128i setzero()
+			{
+				return _mm_setzero_si128();
+			}
+			static __m128i set1(short w)
+			{
+				return _mm_set1_epi16(w);
+			}
+			static __m128i plus(__m128i const & w8A, __m128i const & w8B)
+			{
+				return _mm_add_epi16(w8A, w8B);
+			}
+			static __m128i minus(__m128i const & w8A, __m128i const & w8B)
+			{
+				return _mm_sub_epi16(w8A, w8B);
+			}
+			static __m128i multiplies(__m128i const & w8A, __m128i const & w8B)
+			{
+				return _mm_mullo_epi16(w8A, w8B);
+			}
+			static __m128i divides(__m128i const & w8A, __m128i const & w8B)
+			{
+				__m128i const n4AL = _mm_cvtepi16_epi32(w8A);
+				__m128i const n4AH = _mm_shuffle_epi32(w8A, _MM_SHUFFLE(1, 0, 3, 2));
+				__m128i const n4BL = _mm_cvtepi16_epi32(w8B);
+				__m128i const n4BH = _mm_shuffle_epi32(w8B, _MM_SHUFFLE(1, 0, 3, 2));
+				__m128 const r4AL = _mm_cvtepi32_ps(n4AL);
+				__m128 const r4AH = _mm_cvtepi32_ps(n4AH);
+				__m128 const r4BL = _mm_cvtepi32_ps(n4BL);
+				__m128 const r4BH = _mm_cvtepi32_ps(n4BH);
+				__m128 const r4ALdivBL = _mm_div_ps(r4AL, r4BL);
+				__m128 const r4AHdivBH = _mm_div_ps(r4AH, r4BH);
+				__m128i const n4ALdivBL = _mm_cvtps_epi32(r4ALdivBL);
+				__m128i const n4AHdivBH = _mm_cvtps_epi32(r4AHdivBH);
+				return _mm_packs_epi32(n4ALdivBL, n4AHdivBH);
 			}
 		};
 
