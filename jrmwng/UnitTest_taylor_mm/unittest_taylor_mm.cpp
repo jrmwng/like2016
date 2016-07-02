@@ -10,8 +10,8 @@ namespace UnitTest_taylor_mm
 {		
 	TEST_CLASS(UnitTest_taylor_mm)
 	{
-		template <size_t... uIndex, typename Tfunc>
-		void for_each(std::index_sequence<uIndex...>, Tfunc && tFunc)
+		template <typename Tindex, size_t... uIndex, typename Tfunc>
+		void for_each(std::integer_sequence<Tindex, uIndex...>, Tfunc && tFunc)
 		{
 			using type = int [];
 			(void) type {
@@ -33,10 +33,13 @@ namespace UnitTest_taylor_mm
 			using namespace jrmwng;
 			using namespace jrmwng::mm;
 
-			for_each(std::make_tuple(0.0, 0.0F, 0), [&](auto const tAngle)
+			for_each(std::make_tuple(0.0, 0.0F, 0), [&](auto const & tAngle)
 			{
-				auto const tSin = taylor_sin<8>(tAngle);
-				auto const tCos = taylor_cos<8>(tAngle);
+				for_each(std::make_integer_sequence<int, 8>(), [&](auto const n)
+				{
+					auto const tSin = taylor_sin<n.value>(tAngle);
+					auto const tCos = taylor_cos<n.value>(tAngle);
+				});
 			});
 		}
 
