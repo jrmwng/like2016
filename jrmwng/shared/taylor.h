@@ -39,36 +39,36 @@ namespace jrmwng
 
 		struct taylor_traits
 		{
-			template <size_t uN, typename T>
-			static T power_to_factorial(T t)
+			template <int nN, typename T>
+			static T power_to_factorial(T const & t)
 			{
 				T tProduct(1);
 				{
-					taylor_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					taylor_for_each(std::make_integer_sequence<int, nN>(), [&](auto const n)
 					{
 						tProduct *= t / T(n + 1);
 					});
 				}
 				return tProduct;
 			}
-			template <template <size_t uNth> class taylor_function, size_t uN, typename T>
-			static T eval(T tX, T tA)
+			template <template <int nNth> class taylor_function, int nN, typename T>
+			static T eval(T const & tX, T const & tA)
 			{
 				T tSum(0);
 				{
-					taylor_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					taylor_for_each(std::make_integer_sequence<int, nN>(), [&](auto const n)
 					{
 						tSum += taylor_function<n.value>::eval(tA) * power_to_factorial<n.value, T>(tX - tA);
 					});
 				}
 				return tSum;
 			}
-			template <template <size_t uNth> class taylor_function, size_t uN, int nA, typename T>
-			static T eval(T tX)
+			template <template <int nNth> class taylor_function, int nN, int nA, typename T>
+			static T eval(T const & tX)
 			{
 				T tSum(0);
 				{
-					taylor_for_each(std::make_index_sequence<uN>(), [&](auto const n)
+					taylor_for_each(std::make_integer_sequence<int, nN>(), [&](auto const n)
 					{
 						tSum += taylor_function<n.value>::eval_t<nA>::value * power_to_factorial<n.value, T>(tX - nA);
 					});
@@ -77,15 +77,15 @@ namespace jrmwng
 			}
 		};
 	}
-	template <template <size_t uN> class taylor_function, size_t uN, typename T>
-	T taylor_eval(T tX, T tA)
+	template <template <int nN> class taylor_function, int nN, typename T>
+	T taylor_eval(T const & tX, T const & tA)
 	{
-		return taylor_traits::eval<taylor_function, uN>(tX, tA);
+		return taylor_traits::eval<taylor_function, nN>(tX, tA);
 	}
-	template <template <size_t uN> class taylor_function, size_t uN, int nA, typename T>
-	T taylor_eval(T tX)
+	template <template <int nN> class taylor_function, int nN, int nA, typename T>
+	T taylor_eval(T const & tX)
 	{
-		return taylor_traits::eval<taylor_function, uN, nA>(tX);
+		return taylor_traits::eval<taylor_function, nN, nA>(tX);
 	}
 
 	//
@@ -98,18 +98,18 @@ namespace jrmwng
 		template <typename Ttraits>
 		struct taylor_negative_traits
 		{
-			template <size_t uNth>
-			using derivative_t = taylor_negative_traits<typename Ttraits::template derivative_t<uNth>>;
+			template <int nNth>
+			using derivative_t = taylor_negative_traits<typename Ttraits::template derivative_t<nNth>>;
 
 			template <int nX>
 			struct eval_t
 				: std::integral_constant<int, -Ttraits::template eval_t<nX>::value>
 			{};
 
-			template <size_t uN, typename T>
-			static T eval(T tX)
+			template <int nN, typename T>
+			static T eval(T const & tX)
 			{
-				return -Ttraits::eval<uN, T>(tX);
+				return -Ttraits::eval<nN, T>(tX);
 			}
 		};
 
@@ -133,8 +133,8 @@ namespace jrmwng
 
 		struct taylor_sin_traits
 		{
-			template <size_t uNth>
-			using derivative_t = taylor_switch_t<(uNth % 4), taylor_sin_traits, taylor_cos_traits, taylor_negative_traits<taylor_sin_traits>, taylor_negative_traits<taylor_cos_traits>>;
+			template <int nNth>
+			using derivative_t = taylor_switch_t<(nNth % 4), taylor_sin_traits, taylor_cos_traits, taylor_negative_traits<taylor_sin_traits>, taylor_negative_traits<taylor_cos_traits>>;
 
 			template <int nX>
 			struct eval_t;
@@ -143,16 +143,16 @@ namespace jrmwng
 				: std::integral_constant<int, 0>
 			{};
 
-			template <size_t uN, typename T>
-			static T eval(T tX)
+			template <int nN, typename T>
+			static T eval(T const & tX)
 			{
-				return taylor_eval<derivative_t, uN, 0>(tX);
+				return taylor_eval<derivative_t, nN, 0>(tX);
 			}
 		};
 		struct taylor_cos_traits
 		{
-			template <size_t uNth>
-			using derivative_t = taylor_switch_t<(uNth % 4), taylor_cos_traits, taylor_negative_traits<taylor_sin_traits>, taylor_negative_traits<taylor_cos_traits>, taylor_sin_traits>;
+			template <int nNth>
+			using derivative_t = taylor_switch_t<(nNth % 4), taylor_cos_traits, taylor_negative_traits<taylor_sin_traits>, taylor_negative_traits<taylor_cos_traits>, taylor_sin_traits>;
 
 			template <int nX>
 			struct eval_t;
@@ -161,21 +161,21 @@ namespace jrmwng
 				: std::integral_constant<int, 1>
 			{};
 
-			template <size_t uN, typename T>
-			static T eval(T tX)
+			template <int nN, typename T>
+			static T eval(T const & tX)
 			{
-				return taylor_eval<derivative_t, uN, 0>(tX);
+				return taylor_eval<derivative_t, nN, 0>(tX);
 			}
 		};
 	}
-	template <size_t uN, typename T>
-	T taylor_sin(T tX)
+	template <int nN, typename T>
+	T taylor_sin(T const & tX)
 	{
-		return taylor_sin_traits::eval<uN>(tX);
+		return taylor_sin_traits::eval<nN>(tX);
 	}
-	template <size_t uN, typename T>
-	T taylor_cos(T tX)
+	template <int nN, typename T>
+	T taylor_cos(T const & tX)
 	{
-		return taylor_cos_traits::eval<uN>(tX);
+		return taylor_cos_traits::eval<nN>(tX);
 	}
 }
