@@ -190,6 +190,42 @@ namespace jrmwng
 			}
 		};
 		template <>
+		struct Mtraits<__m256i, int>
+		{
+			static __m256i setzero()
+			{
+				return _mm256_setzero_si256();
+			}
+			static __m256i set1(int n)
+			{
+				return _mm256_set1_epi32(n);
+			}
+			static __m256i plus(__m256i const & n8A, __m256i const & n8B)
+			{
+				return _mm256_add_epi32(n8A, n8B);
+			}
+			static __m256i minus(__m256i const & n8A, __m256i const & n8B)
+			{
+				return _mm256_sub_epi32(n8A, n8B);
+			}
+			static __m256i multiplies(__m256i const & n8A, __m256i const & n8B)
+			{
+				return _mm256_mullo_epi32(n8A, n8B);
+			}
+			static __m256i divides(__m256i const & n8A, __m256i const & n8B)
+			{
+				__m256d const lr4AL = _mm256_cvtepi32_pd(_mm256_extracti128_si256(n8A, 0));
+				__m256d const lr4AH = _mm256_cvtepi32_pd(_mm256_extracti128_si256(n8A, 1));
+				__m256d const lr4BL = _mm256_cvtepi32_pd(_mm256_extracti128_si256(n8B, 0));
+				__m256d const lr4BH = _mm256_cvtepi32_pd(_mm256_extracti128_si256(n8B, 1));
+				__m256d const lr4AdivBL = _mm256_div_pd(lr4AL, lr4BL);
+				__m256d const lr4AdivBH = _mm256_div_pd(lr4AH, lr4BH);
+				__m128i const n4AdivBL = _mm256_cvtpd_epi32(lr4AdivBL);
+				__m128i const n4AdivBH = _mm256_cvtpd_epi32(lr4AdivBH);
+				return _mm256_set_m128i(n4AdivBH, n4AdivBL);
+			}
+		};
+		template <>
 		struct Mtraits<__m128d, double>
 		{
 			static __m128d setzero()
