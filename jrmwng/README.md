@@ -46,3 +46,22 @@ For example, to read the ID of the executing logical processor,
     80000006   0        0        0  1006040        0 L2:64B*0*8way=256KB
     80000007   0        0        0        0      100 -McaOverflowRecov -SUCCOR -HWA CpuPwrSampleTimeRatio=0 -TS -FID -VID -TTP -TM -100MHzSteps -HwPstate +TscInvariant -CPB -EffFreqR0 -ProcFeedbackInterface -ProcPowerReporting
     80000008   0     3027        0        0        0 PhysAddrSize=39 LinAddrSize=48 GuestPhysAddrSize=0 NC=0 ApicIdCoreIdSize=0 PerfTscSize=0
+
+# Branch DCT
+
+Discrete Cosine Transform
+
+C++ Header File: [dct.h](https://github.com/jrmwng/like2016/blob/dct/jrmwng/shared/dct.h)
+
+[dct.h] defines simple overloaded functions (i.e. dct) to perform discrete cosine transform.
+
+    using namespace jrmwng;
+    
+    double aalrPixel[8][8];
+    {
+        // initialize aalrPixel
+    }
+    double aalrData[8][8];
+    {
+        dct(aalrPixel, aalrData); // transform from aalrPixel to aalrData
+    }
