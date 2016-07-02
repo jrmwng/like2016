@@ -281,6 +281,37 @@ namespace jrmwng
 				return _mm_div_ps(r4A, r4B);
 			}
 		};
+		template <>
+		struct Mtraits<__m128i, int>
+		{
+			static __m128i setzero()
+			{
+				return _mm_setzero_si128();
+			}
+			static __m128i set1(int n)
+			{
+				return _mm_set1_epi32(n);
+			}
+			static __m128i plus(__m128i const & n4A, __m128i const & n4B)
+			{
+				return _mm_add_epi32(n4A, n4B);
+			}
+			static __m128i minus(__m128i const & n4A, __m128i const & n4B)
+			{
+				return _mm_sub_epi32(n4A, n4B);
+			}
+			static __m128i multiplies(__m128i const & n4A, __m128i const & n4B)
+			{
+				return _mm_mullo_epi32(n4A, n4B);
+			}
+			static __m128i divides(__m128i const & n4A, __m128i const & n4B)
+			{
+				__m128 const r4A = _mm_cvtepi32_ps(n4A);
+				__m128 const r4B = _mm_cvtepi32_ps(n4B);
+				__m128 const r4AdivB = _mm_div_ps(r4A, r4B);
+				return _mm_cvtps_epi32(r4AdivB);
+			}
+		};
 
 		template <typename Tmm, typename T>
 		struct Mvar

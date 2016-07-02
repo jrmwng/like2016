@@ -37,7 +37,8 @@ namespace UnitTest_mm
 					Mvar<__m256, float>(1),
 					Mvar<__m256i, int>(1),
 					Mvar<__m128d, double>(1),
-					Mvar<__m128, float>(1)),
+					Mvar<__m128, float>(1),
+					Mvar<__m128i, int>(1)),
 				[&](auto const & mm)
 			{
 				using Tmm = std::decay_t<decltype(mm)>;
