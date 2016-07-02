@@ -272,16 +272,8 @@ namespace jrmwng
 			//
 
 			template <typename T1, typename T2>
-			Mvar(Mop<std::plus, T1, Mop<std::negate, T2>> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::minus(Mvar(get<0>(tOp)), Mvar(get<0>(get<1>(tOp)))))
-			{}
-			template <typename T1, typename T2>
 			Mvar(Mop<std::plus, T1, T2> const & tOp)
 				: m_mmValue(Mtraits<Tmm, T>::plus(Mvar(get<0>(tOp)), Mvar(get<1>(tOp))))
-			{}
-			template <typename T1, typename T2>
-			Mvar(Mop<std::minus, T1, Mop<std::negate, T2>> const & tOp)
-				: m_mmValue(Mtraits<Tmm, T>::plus(Mvar(get<0>(tOp)), Mvar(get<0>(get<1>(tOp)))))
 			{}
 			template <typename T1, typename T2>
 			Mvar(Mop<std::minus, T1, T2> const & tOp)
