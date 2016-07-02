@@ -35,6 +35,7 @@ namespace UnitTest_mm
 				std::make_tuple(
 					Mvar<__m256d, double>(1),
 					Mvar<__m256, float>(1),
+					Mvar<__m256i, int>(1),
 					Mvar<__m128d, double>(1),
 					Mvar<__m128, float>(1)),
 				[&](auto const & mm)
@@ -68,7 +69,7 @@ namespace UnitTest_mm
 				auto const mm_A_div_negB = mmA / (-mmB);
 				Tmm const mmAdivB = mmA / mmB;
 
-				Tmm mmProduct(1.0);
+				Tmm mmProduct(1);
 				{
 					mmProduct *= mmA;
 					mmProduct *= mmA + mmB;
@@ -84,7 +85,7 @@ namespace UnitTest_mm
 					mmProduct /= (-mmA);
 				}
 
-				Tmm mmSum(0.0);
+				Tmm mmSum(0);
 				{
 					mmSum += mmA;
 					mmSum += mmA + mmB;
