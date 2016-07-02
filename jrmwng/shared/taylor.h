@@ -40,7 +40,7 @@ namespace jrmwng
 		struct taylor_traits
 		{
 			template <size_t uN, typename T>
-			static T power_to_factorial(T t)
+			static T power_to_factorial(T const & t)
 			{
 				T tProduct(1);
 				{
@@ -52,7 +52,7 @@ namespace jrmwng
 				return tProduct;
 			}
 			template <template <size_t uNth> class taylor_function, size_t uN, typename T>
-			static T eval(T tX, T tA)
+			static T eval(T const & tX, T const & tA)
 			{
 				T tSum(0);
 				{
@@ -64,7 +64,7 @@ namespace jrmwng
 				return tSum;
 			}
 			template <template <size_t uNth> class taylor_function, size_t uN, int nA, typename T>
-			static T eval(T tX)
+			static T eval(T const & tX)
 			{
 				T tSum(0);
 				{
@@ -78,12 +78,12 @@ namespace jrmwng
 		};
 	}
 	template <template <size_t uN> class taylor_function, size_t uN, typename T>
-	T taylor_eval(T tX, T tA)
+	T taylor_eval(T const & tX, T const & tA)
 	{
 		return taylor_traits::eval<taylor_function, uN>(tX, tA);
 	}
 	template <template <size_t uN> class taylor_function, size_t uN, int nA, typename T>
-	T taylor_eval(T tX)
+	T taylor_eval(T const & tX)
 	{
 		return taylor_traits::eval<taylor_function, uN, nA>(tX);
 	}
@@ -107,7 +107,7 @@ namespace jrmwng
 			{};
 
 			template <size_t uN, typename T>
-			static T eval(T tX)
+			static T eval(T const & tX)
 			{
 				return -Ttraits::eval<uN, T>(tX);
 			}
@@ -144,7 +144,7 @@ namespace jrmwng
 			{};
 
 			template <size_t uN, typename T>
-			static T eval(T tX)
+			static T eval(T const & tX)
 			{
 				return taylor_eval<derivative_t, uN, 0>(tX);
 			}
@@ -162,19 +162,19 @@ namespace jrmwng
 			{};
 
 			template <size_t uN, typename T>
-			static T eval(T tX)
+			static T eval(T const & tX)
 			{
 				return taylor_eval<derivative_t, uN, 0>(tX);
 			}
 		};
 	}
 	template <size_t uN, typename T>
-	T taylor_sin(T tX)
+	T taylor_sin(T const & tX)
 	{
 		return taylor_sin_traits::eval<uN>(tX);
 	}
 	template <size_t uN, typename T>
-	T taylor_cos(T tX)
+	T taylor_cos(T const & tX)
 	{
 		return taylor_cos_traits::eval<uN>(tX);
 	}
