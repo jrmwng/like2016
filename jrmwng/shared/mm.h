@@ -172,6 +172,10 @@ namespace jrmwng
 			{
 				return _mm256_set1_ps(r);
 			}
+			static __m256 set1(int n)
+			{
+				return _mm256_cvtepi32_ps(_mm256_set1_epi32(n));
+			}
 			static __m256 plus(__m256 const & r8A, __m256 const & r8B)
 			{
 				return _mm256_add_ps(r8A, r8B);
@@ -308,6 +312,10 @@ namespace jrmwng
 			{
 				return _mm_set1_ps(r);
 			}
+			static __m128 set1(int n)
+			{
+				return _mm_cvtepi32_ps(_mm_set1_epi32(n));
+			}
 			static __m128 plus(__m128 const & r4A, __m128 const & r4B)
 			{
 				return _mm_add_ps(r4A, r4B);
@@ -413,8 +421,9 @@ namespace jrmwng
 			Mvar()
 				: m_mmValue(Mtraits<Tmm, T>::setzero())
 			{}
-			Mvar(T t)
-				: m_mmValue(Mtraits<Tmm, T>::set1(t))
+			template <typename T1>
+			Mvar(T1 t1)
+				: m_mmValue(Mtraits<Tmm, T>::set1(t1))
 			{}
 			Mvar(Tmm const & mm)
 				: m_mmValue(mm)
