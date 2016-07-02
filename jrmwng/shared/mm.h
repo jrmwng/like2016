@@ -356,6 +356,46 @@ namespace jrmwng
 				return _mm_cvtps_epi32(r4AdivB);
 			}
 		};
+		template <>
+		struct Mtraits<__m128i, short>
+		{
+			static __m128i setzero()
+			{
+				return _mm_setzero_si128();
+			}
+			static __m128i set1(short w)
+			{
+				return _mm_set1_epi16(w);
+			}
+			static __m128i plus(__m128i const & w8A, __m128i const & w8B)
+			{
+				return _mm_add_epi16(w8A, w8B);
+			}
+			static __m128i minus(__m128i const & w8A, __m128i const & w8B)
+			{
+				return _mm_sub_epi16(w8A, w8B);
+			}
+			static __m128i multiplies(__m128i const & w8A, __m128i const & w8B)
+			{
+				return _mm_mullo_epi16(w8A, w8B);
+			}
+			static __m128i divides(__m128i const & w8A, __m128i const & w8B)
+			{
+				__m128i const n4AL = _mm_cvtepi16_epi32(w8A);
+				__m128i const n4AH = _mm_shuffle_epi32(w8A, _MM_SHUFFLE(1, 0, 3, 2));
+				__m128i const n4BL = _mm_cvtepi16_epi32(w8B);
+				__m128i const n4BH = _mm_shuffle_epi32(w8B, _MM_SHUFFLE(1, 0, 3, 2));
+				__m128 const r4AL = _mm_cvtepi32_ps(n4AL);
+				__m128 const r4AH = _mm_cvtepi32_ps(n4AH);
+				__m128 const r4BL = _mm_cvtepi32_ps(n4BL);
+				__m128 const r4BH = _mm_cvtepi32_ps(n4BH);
+				__m128 const r4ALdivBL = _mm_div_ps(r4AL, r4BL);
+				__m128 const r4AHdivBH = _mm_div_ps(r4AH, r4BH);
+				__m128i const n4ALdivBL = _mm_cvtps_epi32(r4ALdivBL);
+				__m128i const n4AHdivBH = _mm_cvtps_epi32(r4AHdivBH);
+				return _mm_packs_epi32(n4ALdivBL, n4AHdivBH);
+			}
+		};
 
 		template <typename Tmm, typename T>
 		struct Mvar
