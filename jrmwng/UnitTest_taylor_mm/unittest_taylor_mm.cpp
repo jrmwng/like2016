@@ -33,7 +33,16 @@ namespace UnitTest_taylor_mm
 			using namespace jrmwng;
 			using namespace jrmwng::mm;
 
-			for_each(std::make_tuple(0.0, 0.0F, 0), [&](auto const & tAngle)
+			for_each(
+				std::make_tuple(
+					0.0,
+					0.0F,
+					0,
+					Mvar<__m256d, double>(0.0),
+					Mvar<__m256i, int>(0),
+					Mvar<__m128d, double>(0.0),
+					Mvar<__m128i, int>(0)
+				), [&](auto const & tAngle)
 			{
 				for_each(std::make_integer_sequence<int, 8>(), [&](auto const n)
 				{
