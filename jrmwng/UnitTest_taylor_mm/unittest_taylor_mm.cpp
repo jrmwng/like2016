@@ -39,8 +39,10 @@ namespace UnitTest_taylor_mm
 					0.0F,
 					0,
 					Mvar<__m256d, double>(0.0),
+					Mvar<__m256, float>(0.0F),
 					Mvar<__m256i, int>(0),
 					Mvar<__m128d, double>(0.0),
+					Mvar<__m128, float>(0.0F),
 					Mvar<__m128i, int>(0)
 				), [&](auto const & tAngle)
 			{
