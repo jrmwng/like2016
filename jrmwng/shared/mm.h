@@ -63,7 +63,7 @@ namespace jrmwng
 		{
 			return Mop<std::minus, T1, T2>(t1, get<0>(t2));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator + (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::plus, T1, T2>(t1, t2);
@@ -83,7 +83,7 @@ namespace jrmwng
 		{
 			return Mop<std::plus, T1, T2>(t1, get<0>(t2));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator - (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::minus, T1, T2>(t1, t2);
@@ -103,7 +103,7 @@ namespace jrmwng
 		{
 			return -(Mop<std::multiplies, T1, T2>(t1, get<0>(t2)));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator * (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::multiplies, T1, T2>(t1, t2);
@@ -123,7 +123,7 @@ namespace jrmwng
 		{
 			return -(Mop<std::divides, T1, T2>(t1, get<0>(t2)));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value || std::is_base_of<Mexpr, T2>::value)>>
 		auto operator / (T1 const & t1, T2 const & t2)
 		{
 			return Mop<std::divides, T1, T2>(t1, t2);
@@ -171,6 +171,10 @@ namespace jrmwng
 			static __m256 set1(float r)
 			{
 				return _mm256_set1_ps(r);
+			}
+			static __m256 set1(int n)
+			{
+				return _mm256_cvtepi32_ps(_mm256_set1_epi32(n));
 			}
 			static __m256 plus(__m256 const & r8A, __m256 const & r8B)
 			{
@@ -308,6 +312,10 @@ namespace jrmwng
 			{
 				return _mm_set1_ps(r);
 			}
+			static __m128 set1(int n)
+			{
+				return _mm_cvtepi32_ps(_mm_set1_epi32(n));
+			}
 			static __m128 plus(__m128 const & r4A, __m128 const & r4B)
 			{
 				return _mm_add_ps(r4A, r4B);
@@ -413,8 +421,9 @@ namespace jrmwng
 			Mvar()
 				: m_mmValue(Mtraits<Tmm, T>::setzero())
 			{}
-			Mvar(T t)
-				: m_mmValue(Mtraits<Tmm, T>::set1(t))
+			template <typename T1>
+			Mvar(T1 t1)
+				: m_mmValue(Mtraits<Tmm, T>::set1(t1))
 			{}
 			Mvar(Tmm const & mm)
 				: m_mmValue(mm)
