@@ -251,5 +251,5 @@ paket-files/
 .idea/
 *.sln.iml
 
-# README.md
-README.md
+# markdown
+*.md
