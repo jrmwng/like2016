@@ -1,6 +1,6 @@
 # Branch CPUID
 
-## C++ Header File: [cpuid.h](https://github.com/jrmwng/like2016/blob/cpuid/jrmwng/shared/cpuid.h)
+C++ Header File: [cpuid.h](https://github.com/jrmwng/like2016/blob/cpuid/jrmwng/shared/cpuid.h)
 
 [cpuid.h] contains convenient classes (e.g. cpuid_forest_t, cpuid_info_t<0x01>) around CPUID instruction.
 For example, to read the ID of the executing logical processor,
