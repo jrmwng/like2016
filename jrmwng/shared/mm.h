@@ -25,12 +25,6 @@ namespace jrmwng
 			Mop(Targs const &... tArgs)
 				: m_Args(tArgs...)
 			{}
-
-			template <size_t uIndex>
-			auto const & get() const
-			{
-				return std::get<uIndex>(m_Args);
-			}
 		};
 		template <size_t uIndex, template <typename T> class Top, typename... Targs>
 		auto get(Mop<Top, Targs...> const & tOp)
@@ -38,20 +32,61 @@ namespace jrmwng
 			return std::get<uIndex>(tOp.m_Args);
 		}
 
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
-		auto operator + (T1 const & t1, T2 const & t2)
+		template <typename T1, typename T2>
+		auto operator - (Mop<std::minus, T1, T2> const & tOp)
 		{
-			return Mop<std::plus, T1, T2>(t1, t2);
+			return Mop<std::minus, T2, T1>(get<1>(tOp), get<0>(tOp));
 		}
-		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
-		auto operator - (T1 const & t1, T2 const & t2)
+		template <typename T1>
+		auto operator - (Mop<std::negate, T1> const & t1)
 		{
-			return Mop<std::minus, T1, T2>(t1, t2);
+			return get<0>(t1);
 		}
 		template <typename T1, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value)>>
 		auto operator - (T1 const & t1)
 		{
 			return Mop<std::negate, T1>(t1);
+		}
+
+		template <typename T1, typename T2>
+		auto operator + (Mop<std::negate, T1> const & t1, Mop<std::negate, T2> const & t2)
+		{
+			return -(Mop<std::plus, T1, T2>(get<0>(t1), get<0>(t2)));
+		}
+		template <typename T1, typename T2>
+		auto operator + (Mop<std::negate, T1> const & t1, T2 const & t2)
+		{
+			return Mop<std::minus, T2, T1>(t2, get<0>(t1));
+		}
+		template <typename T1, typename T2>
+		auto operator + (T1 const & t1, Mop<std::negate, T2> const & t2)
+		{
+			return Mop<std::minus, T1, T2>(t1, get<0>(t2));
+		}
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		auto operator + (T1 const & t1, T2 const & t2)
+		{
+			return Mop<std::plus, T1, T2>(t1, t2);
+		}
+		template <typename T1, typename T2>
+		auto operator - (Mop<std::negate, T1> const & t1, Mop<std::negate, T2> const & t2)
+		{
+			return Mop<std::minus, T2, T1>(get<0>(t2), get<0>(t1));
+		}
+		template <typename T1, typename T2>
+		auto operator - (Mop<std::negate, T1> const & t1, T2 const & t2)
+		{
+			return -(Mop<std::plus, T1, T2>(get<0>(t1), t2));
+		}
+		template <typename T1, typename T2>
+		auto operator - (T1 const & t1, Mop<std::negate, T2> const & t2)
+		{
+			return Mop<std::plus, T1, T2>(t1, get<0>(t2));
+		}
+		template <typename T1, typename T2, typename Tenable = std::enable_if_t<(std::is_base_of<Mexpr, T1>::value && std::is_base_of<Mexpr, T2>::value)>>
+		auto operator - (T1 const & t1, T2 const & t2)
+		{
+			return Mop<std::minus, T1, T2>(t1, t2);
 		}
 		template <typename T1, typename T2>
 		auto operator * (Mop<std::negate, T1> const & t1, Mop<std::negate, T2> const & t2)
