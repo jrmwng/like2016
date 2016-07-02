@@ -75,13 +75,13 @@ namespace UnitTest_mm
 					mmProduct *= mmA - mmB;
 					mmProduct *= mmA * mmB;
 					mmProduct *= mmA / mmB;
-					//mmProduct *= (-mmA);
+					mmProduct *= (-mmA);
 					mmProduct /= mmA;
 					mmProduct /= mmA + mmB;
 					mmProduct /= mmA - mmB;
 					mmProduct /= mmA * mmB;
 					mmProduct /= mmA / mmB;
-					//mmProduct /= (-mmA);
+					mmProduct /= (-mmA);
 				}
 
 				Tmm mmSum(0.0);
