@@ -70,7 +70,7 @@ namespace jrmwng
 				{
 					taylor_for_each(std::make_integer_sequence<int, nN>(), [&](auto const n)
 					{
-						tSum += taylor_function<n.value>::eval_t<nA>::value * power_to_factorial<n.value, T>(tX - nA);
+						tSum += taylor_function<n.value>::template eval_t<nA>() * power_to_factorial<n.value, T>(tX - nA);
 					});
 				}
 				return tSum;
