@@ -1,9 +1,7 @@
-//#include "rtm.h"
-#include <thread>
-//#include <unistd.h>
-#include <iostream>
 #include <intrin.h>
+#include <thread>
 #include <Windows.h>
+#include <iostream>
 
 using namespace std;
 
@@ -22,36 +20,36 @@ typedef struct Bank {
 bool done = 0;
 long *tx, *_abort, *capacity, *debug, *failed, *conflict, *zero;
 
+// global scope
+volatile int Touch;
+
 void* f1(bank_t* bank, int id) {
 	for (int i = 0; i<OPSIZE; i++) {
-		int src = 0; // rand() % bank->size;
-		int dst = 1; // rand() % bank->size;
+		int src = rand() % bank->size;
+		int dst = rand() % bank->size;
 		while (src == dst) {
 			dst = rand() % bank->size;
 		}
-
+		Touch = bank->accounts[src].balance + bank->accounts[dst].balance;
+		// Note, this will touch the location (and load the page table) for for current src and dst
+		// PREFETCH will not necessarily fetch the data should the page(s) not be mapped by the TLB
 		while (true) {
-			_mm_prefetch(reinterpret_cast<char*>(&bank), _MM_HINT_T0);
-			_mm_prefetch(reinterpret_cast<char*>(&bank->accounts), _MM_HINT_T0);
-			_mm_prefetch(reinterpret_cast<char*>(&bank->accounts[src].balance), _MM_HINT_T0);
-			_mm_prefetch(reinterpret_cast<char*>(&bank->accounts[dst].balance), _MM_HINT_T0);
-			auto & src_account = bank->accounts[src];
-			auto & dst_account = bank->accounts[dst];
 			unsigned stat = _xbegin();
 			if (stat == _XBEGIN_STARTED) {
-				src_account.balance++;
-				dst_account.balance--;
+				bank->accounts[src].balance++;
+				bank->accounts[dst].balance--;
 				_xend();
 				tx[id]++;
 				break;
 			}
 			else {
-				for (int j = 1; j < 16; j++)
-					bank->accounts[j * 1024 * 4096 / sizeof(account_t)].balance++;
 				_abort[id]++;
 
 				if (stat == 0) {
 					zero[id]++;
+					// ?? interrupt may have unmapped page holding [src] and/or [dst]
+					Touch = bank->accounts[src].balance + bank->accounts[dst].balance;
+					continue;
 				}
 				if (stat & _XABORT_CONFLICT) {
 					conflict[id]++;
@@ -113,16 +111,11 @@ void* f2(bank_t* bank) {
 }
 
 int main(int argc, char** argv) {
-	constexpr int accounts = 16 * 1024 * 4096 / sizeof(account_t);
+	int accounts = 10240;
 
 	bank_t* bank = new bank_t;
 	bank->accounts = new account_t[accounts];
 	bank->size = accounts;
-
-	if (VirtualLock(bank->accounts, 4096) == FALSE)
-	{
-		__debugbreak();
-	}
 
 	for (int i = 0; i<accounts; i++) {
 		bank->accounts[i].number = i;
@@ -144,9 +137,10 @@ int main(int argc, char** argv) {
 		pid[i] = new thread(f1, bank, i);
 	}
 
-	//	sleep(5);
+	// sleep(5);
 	for (int i = 0; i<n_threads; i++) {
 		pid[i]->join();
 	}
 	return 0;
 }
+
