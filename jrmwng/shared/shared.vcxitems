@@ -25,4 +25,7 @@
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)cpuid.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)jacobi.h" />
+  </ItemGroup>
 </Project>
