@@ -20,9 +20,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)mm.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="$(MSBuildThisFileDirectory)taylor.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)dct.h" />
   </ItemGroup>
   <ItemGroup>
