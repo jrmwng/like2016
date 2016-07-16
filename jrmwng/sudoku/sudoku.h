@@ -24,8 +24,11 @@ namespace jrmwng
 		enum
 		{
 			SUDOKU_SIZE = 3,
+			// 9 possible numbers in a cell
 			SUDOKU_CANDIDATE_COUNT = 9,
-			SUDOKU_NUMBER_COUNT = 81,
+			// 81 cells = 9 rows * 9 columns
+			SUDOKU_CELL_COUNT = 81,
+			// 27 groups = 9 box groups + 9 row groups + 9 column groups
 			SUDOKU_GROUP_COUNT = 27,
 		};
 	};
@@ -33,16 +36,37 @@ namespace jrmwng
 	template <typename TT>
 	struct sudoku_t
 	{
-		struct number_t
+		struct cell_t
 		{
-			long lCandidateSet;
-			long lGroupSet;
-		} astNumber[TT::SUDOKU_NUMBER_COUNT];
+			long lCandidateSet; // bits of potential values
+			long lGroupSet; // bits of belonging groups
+		}
+		astCell[TT::SUDOKU_CELL_COUNT];
 
+		// group in box (3x3)
+		// 1 2 3
+		// 4 5 6
+		// 7 8 9
+		//
+		// group in row (1x9)
+		// 1 2 3 4 5 6 7 8 9
+		//
+		// group in column (9x1)
+		// 1
+		// 2
+		// 3
+		// 4
+		// 5
+		// 6
+		// 7
+		// 8
+		// 9
 		struct group_t
 		{
-			long alNumberIndex[TT::SUDOKU_CANDIDATE_COUNT];
-		} astGroup[TT::SUDOKU_GROUP_COUNT];
+			// index of astCell
+			long alCellIndex[TT::SUDOKU_CANDIDATE_COUNT]; // 9 numbers in each group
+		}
+		astGroup[TT::SUDOKU_GROUP_COUNT];
 
 		sudoku_t(void)
 		{
@@ -54,107 +78,127 @@ namespace jrmwng
 					{
 						for (unsigned x1 = 0; x1 < TT::SUDOKU_SIZE; x1++)
 						{
-							auto & stNumber = astNumber[(x1 + x0 * TT::SUDOKU_SIZE) + (y1 + y0 * TT::SUDOKU_SIZE) * TT::SUDOKU_CANDIDATE_COUNT];
+							auto & stCell = astCell[(x1 + x0 * TT::SUDOKU_SIZE) + (y1 + y0 * TT::SUDOKU_SIZE) * TT::SUDOKU_CANDIDATE_COUNT];
 							auto & stGroupBox = astGroup[TT::SUDOKU_CANDIDATE_COUNT * 0 + x0 + y0 * TT::SUDOKU_SIZE];
 							auto & stGroupCol = astGroup[TT::SUDOKU_CANDIDATE_COUNT * 1 + x1 + x0 * TT::SUDOKU_SIZE];
 							auto & stGroupRow = astGroup[TT::SUDOKU_CANDIDATE_COUNT * 2 + y1 + y0 * TT::SUDOKU_SIZE];
 							{
-								stNumber.lCandidateSet = (1 << TT::SUDOKU_CANDIDATE_COUNT) - 1;
-								stNumber.lGroupSet = 0;
-								stNumber.lGroupSet |= (1 << (&stGroupBox - astGroup));
-								stNumber.lGroupSet |= (1 << (&stGroupCol - astGroup));
-								stNumber.lGroupSet |= (1 << (&stGroupRow - astGroup));
-								stGroupBox.alNumberIndex[x1 + y1 * 3] = static_cast<long>(&stNumber - astNumber);
-								stGroupCol.alNumberIndex[y1 + y0 * 3] = static_cast<long>(&stNumber - astNumber);
-								stGroupRow.alNumberIndex[x1 + x0 * 3] = static_cast<long>(&stNumber - astNumber);
+								stCell.lCandidateSet = (1 << TT::SUDOKU_CANDIDATE_COUNT) - 1;
+								stCell.lGroupSet = 0;
+								stCell.lGroupSet |= (1 << (&stGroupBox - astGroup));
+								stCell.lGroupSet |= (1 << (&stGroupCol - astGroup));
+								stCell.lGroupSet |= (1 << (&stGroupRow - astGroup));
+								stGroupBox.alCellIndex[x1 + y1 * 3] = static_cast<long>(&stCell - astCell);
+								stGroupCol.alCellIndex[y1 + y0 * 3] = static_cast<long>(&stCell - astCell);
+								stGroupRow.alCellIndex[x1 + x0 * 3] = static_cast<long>(&stCell - astCell);
 							}
 						}
 					}
 				}
 			}
 		}
-		void update(long lGroupSet0)
+		void update(long lDirtyGroupSet)
 		{
 			// loop for dirty group-set
-			for (__m128i xmmGroupSet1 = _mm_setzero_si128(); lGroupSet0; lGroupSet0 = std::accumulate(std::cbegin(xmmGroupSet1.m128i_i32), std::cend(xmmGroupSet1.m128i_i32), 0, std::bit_or<int>()), xmmGroupSet1 = _mm_setzero_si128())
+			for (__m128i xmmDirtyGroupSet = _mm_setzero_si128(); lDirtyGroupSet; lDirtyGroupSet = std::accumulate(std::cbegin(xmmDirtyGroupSet.m128i_i32), std::cend(xmmDirtyGroupSet.m128i_i32), 0, std::bit_or<int>()), xmmDirtyGroupSet = _mm_setzero_si128())
 			{
 				// for each dirty group
-				for (unsigned long ulGroupIndex0; _BitScanForward(&ulGroupIndex0, lGroupSet0); _bittestandreset(&lGroupSet0, ulGroupIndex0))
+				for (unsigned long ulDirtyGroupIndex; _BitScanForward(&ulDirtyGroupIndex, lDirtyGroupSet); _bittestandreset(&lDirtyGroupSet, ulDirtyGroupIndex))
 				{
-					auto const & stGroup = astGroup[ulGroupIndex0];
+					auto const & stDirtyGroup = astGroup[ulDirtyGroupIndex];
 
 					if (TT::SUDOKU_CANDIDATE_COUNT == 9)
 					{
-						long lGroupSet2 = 0;
-						std::tuple<__m128i, __m128i, __m128i> axmmCandidateSet012;
-						std::tuple<__m128i, __m128i, __m128i> axmmGroupSetABC;
-						std::tuple<__m128i, __m128i, __m128i> axmmGroupSet;
-						std::tuple<__m128i, __m128i, __m128i> axmmCandidateSetABC;
+						std::tuple<__m128i, __m128i, __m128i> axmmCombinedCandidateSet;
+						std::tuple<__m128i, __m128i, __m128i> axmmNoChangeGroupSet;
+						std::tuple<__m128i, __m128i, __m128i> axmmOriginalGroupSet;
+						std::tuple<__m128i, __m128i, __m128i> axmmNewCandidateSet;
 						{
 							sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 							{
-								__m128i const xmmCandidateSet0 = _mm_unpacklo_epi16(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[i * 3 + 0]].lCandidateSet), 0));
-								__m128i const xmmCandidateSet1 = _mm_unpacklo_epi32(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[i * 3 + 1]].lCandidateSet), 0));
-								__m128i const xmmCandidateSet2 = _mm_unpacklo_epi64(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astNumber[stGroup.alNumberIndex[i * 3 + 2]].lCandidateSet), 0));
+								// alCell[0].lCandidateSet 0 alCell[0].lCandidateSet 0 alCell[0].lCandidateSet 0 alCell[0].lCandidateSet 0
+								// [123456789] [] [123456789] [] [123456789] [] [123456789] []
+								__m128i const xmmCandidateSet0 = _mm_unpacklo_epi16(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astCell[stDirtyGroup.alCellIndex[i * 3 + 0]].lCandidateSet), 0));
+								// alCell[1].lCandidateSet alCell[1].lCandidateSet 0 0 alCell[1].lCandidateSet alCell[1].lCandidateSet 0 0
+								// [123456789] [123456789] [] [] [123456789] [123456789] [] []
+								__m128i const xmmCandidateSet1 = _mm_unpacklo_epi32(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astCell[stDirtyGroup.alCellIndex[i * 3 + 1]].lCandidateSet), 0));
+								// alCell[2].lCandidateSet alCell[2].lCandidateSet alCell[2].lCandidateSet alCell[2].lCandidateSet 0 0 0 0
+								// [123456789] [123456789] [123456789] [123456789] [] [] [] []
+								__m128i const xmmCandidateSet2 = _mm_unpacklo_epi64(_mm_setzero_si128(), _mm_shufflelo_epi16(_mm_cvtsi32_si128(astCell[stDirtyGroup.alCellIndex[i * 3 + 2]].lCandidateSet), 0));
 
-								__m128i const xmmCandidateSet012 = _mm_or_si128(_mm_or_si128(xmmCandidateSet0, xmmCandidateSet1), xmmCandidateSet2);
-								__m128i const xmmGroupSet = _mm_set_epi32(0, astNumber[stGroup.alNumberIndex[i * 3 + 2]].lGroupSet, astNumber[stGroup.alNumberIndex[i * 3 + 1]].lGroupSet, astNumber[stGroup.alNumberIndex[i * 3 + 0]].lGroupSet);
+								// 01FF 0000 01FF 0000 01FF 0000 01FF 0000
+								// 01FF 01FF 0000 0000 01FF 01FF 0000 0000
+								// 01FF 01FF 01FF 01FF 0000 0000 0000 0000
+								__m128i const xmmCombinedCandidateSet = _mm_or_si128(_mm_or_si128(xmmCandidateSet0, xmmCandidateSet1), xmmCandidateSet2);
 
-								std::get<i.value>(axmmCandidateSet012) = xmmCandidateSet012;
-								std::get<i.value>(axmmGroupSet) = xmmGroupSet;
-								std::get<i.value>(axmmGroupSetABC) = xmmGroupSet;
-								std::get<i.value>(axmmCandidateSetABC) = _mm_and_si128(_mm_shufflelo_epi16(xmmCandidateSet012, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
+								// 0 alCell[2].lGroupSet alCell[1].lGroupSet alCell[0].lGroupSet
+								// 0 box[0]col[2]row[0] box[0]col[1]row[0] box[0]col[0]row[0]
+								// 0 40801 40401 40201
+								__m128i const xmmGroupSet = _mm_set_epi32(0, astCell[stDirtyGroup.alCellIndex[i * 3 + 2]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 1]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 0]].lGroupSet);
+
+
+								std::get<i.value>(axmmCombinedCandidateSet) = xmmCombinedCandidateSet;
+								std::get<i.value>(axmmOriginalGroupSet) = xmmGroupSet;
+								std::get<i.value>(axmmNoChangeGroupSet) = xmmGroupSet;
+
+								// 0000 0000 0000 0000 0000 0000 0000 01FF
+								// 0000 0000 0000 0000 0000 01FF 0000 0000
+								// 0000 0000 0000 01FF 0000 0000 0000 0000
+								std::get<i.value>(axmmNewCandidateSet) = _mm_and_si128(_mm_shufflelo_epi16(xmmCombinedCandidateSet, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
 							});
 						}
 
-						for (long lNumberSet2 = 0; lNumberSet2 < (1 << TT::SUDOKU_CANDIDATE_COUNT); lNumberSet2 += (1 << 6), std::get<2>(axmmCandidateSet012) = _mm_alignr_epi8(std::get<2>(axmmCandidateSet012), std::get<2>(axmmCandidateSet012), 2))
+						for (long lNumberSet789 = 0; lNumberSet789 < (1 << TT::SUDOKU_CANDIDATE_COUNT); lNumberSet789 += (1 << 6), std::get<2>(axmmCombinedCandidateSet) = _mm_alignr_epi8(std::get<2>(axmmCombinedCandidateSet), std::get<2>(axmmCombinedCandidateSet), 2))
 						{
-							long const lCandidateSet2 = _mm_extract_epi16(std::get<2>(axmmCandidateSet012), 0);
-							unsigned const uMinCntNumber2 = __popcnt(lNumberSet2);
-							unsigned const uMaxCntNumber2 = __popcnt(lNumberSet2) + 6;
-							unsigned const uMinCntCandidate2 = __popcnt(lCandidateSet2);
-							unsigned const uMaxCntCandidate2 = __popcnt(lCandidateSet2 | _mm_extract_epi16(_mm_or_si128(std::get<1>(axmmCandidateSet012), std::get<0>(axmmCandidateSet012)), 7));
+							long const lCandidateSet789 = _mm_extract_epi16(std::get<2>(axmmCombinedCandidateSet), 0);
+							unsigned const uMinCntNumber789 = __popcnt(lNumberSet789);
+							unsigned const uMaxCntNumber789 = __popcnt(lNumberSet789) + 6;
+							unsigned const uMinCntCandidate789 = __popcnt(lCandidateSet789);
+							unsigned const uMaxCntCandidate789 = __popcnt(lCandidateSet789 | _mm_extract_epi16(_mm_or_si128(std::get<1>(axmmCombinedCandidateSet), std::get<0>(axmmCombinedCandidateSet)), 7));
 
-							if (uMinCntCandidate2 <= uMaxCntNumber2 &&
-								uMinCntNumber2 <= uMaxCntCandidate2)
+							if (uMinCntCandidate789 <= uMaxCntNumber789 &&
+								uMinCntNumber789 <= uMaxCntCandidate789)
 							{
-								for (long lNumberSet1 = lNumberSet2; lNumberSet1 < lNumberSet2 + (1 << 6); lNumberSet1 += (1 << 3), std::get<1>(axmmCandidateSet012) = _mm_alignr_epi8(std::get<1>(axmmCandidateSet012), std::get<1>(axmmCandidateSet012), 2))
+								for (long lNumberSet456789 = lNumberSet789; lNumberSet456789 < lNumberSet789 + (1 << 6); lNumberSet456789 += (1 << 3), std::get<1>(axmmCombinedCandidateSet) = _mm_alignr_epi8(std::get<1>(axmmCombinedCandidateSet), std::get<1>(axmmCombinedCandidateSet), 2))
 								{
-									long const lCandidateSet1 = lCandidateSet2 | _mm_extract_epi16(std::get<1>(axmmCandidateSet012), 0);
-									unsigned const uMinCntNumber1 = __popcnt(lNumberSet1);
-									unsigned const uMaxCntNumber1 = __popcnt(lNumberSet1) + 3;
-									unsigned const uMinCntCandidate1 = __popcnt(lCandidateSet1);
-									unsigned const uMaxCntCandidate1 = __popcnt(lCandidateSet1 | _mm_extract_epi16(std::get<0>(axmmCandidateSet012), 7));
+									long const lCandidateSet456789 = lCandidateSet789 | _mm_extract_epi16(std::get<1>(axmmCombinedCandidateSet), 0);
+									unsigned const uMinCntNumber456789 = __popcnt(lNumberSet456789);
+									unsigned const uMaxCntNumber456789 = __popcnt(lNumberSet456789) + 3;
+									unsigned const uMinCntCandidate456789 = __popcnt(lCandidateSet456789);
+									unsigned const uMaxCntCandidate456789 = __popcnt(lCandidateSet456789 | _mm_extract_epi16(std::get<0>(axmmCombinedCandidateSet), 7));
 
-									if (uMinCntCandidate1 <= uMaxCntNumber1 &&
-										uMinCntNumber1 <= uMaxCntCandidate1)
+									if (uMinCntCandidate456789 <= uMaxCntNumber456789 &&
+										uMinCntNumber456789 <= uMaxCntCandidate456789)
 									{
-										for (long lNumberSet0 = lNumberSet1; lNumberSet0 < lNumberSet1 + (1 << 3); lNumberSet0++, std::get<0>(axmmCandidateSet012) = _mm_alignr_epi8(std::get<0>(axmmCandidateSet012), std::get<0>(axmmCandidateSet012), 2))
+										for (long lNumberSet123456789 = lNumberSet456789; lNumberSet123456789 < lNumberSet456789 + (1 << 3); lNumberSet123456789++, std::get<0>(axmmCombinedCandidateSet) = _mm_alignr_epi8(std::get<0>(axmmCombinedCandidateSet), std::get<0>(axmmCombinedCandidateSet), 2))
 										{
-											long const lCandidateSet0 = lCandidateSet1 | _mm_extract_epi16(std::get<0>(axmmCandidateSet012), 0);
-											unsigned const uPopCntNumber0 = __popcnt(lNumberSet0);
-											unsigned const uPopCntCandidate0 = __popcnt(lCandidateSet0);
+											long const lCandidateSet123456789 = lCandidateSet456789 | _mm_extract_epi16(std::get<0>(axmmCombinedCandidateSet), 0);
+											unsigned const uPopCntNumber123456789 = __popcnt(lNumberSet123456789);
+											unsigned const uPopCntCandidate123456789 = __popcnt(lCandidateSet123456789);
 
-											__m128i const xmmNumberSet = _mm_set1_epi32(lNumberSet0);
-											__m128i const xmmCandidateSet = _mm_set1_epi32(lCandidateSet0);
+											__m128i const xmmNumberSet = _mm_set1_epi32(lNumberSet123456789);
+											__m128i const xmmCandidateSet = _mm_set1_epi32(lCandidateSet123456789);
 
-											if (uPopCntCandidate0 == uPopCntNumber0)
+											if (uPopCntCandidate123456789 == uPopCntNumber123456789)
 											{
 												sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 												{
+													// 00000000 00000004 00000002 00000001
+													// 00000000 00000020 00000010 00000008
+													// 00000000 00000100 00000080 00000040
 													__m128i const xmmNotNumberBit = _mm_andnot_si128(xmmNumberSet, _mm_set_epi32(0, (0x004 << (i * 3)), (0x002 << (i * 3)), (0x001 << (i * 3))));
 
 													__m128i const xmmNotNumberNull = _mm_cmpeq_epi32(xmmNotNumberBit, _mm_setzero_si128());
 
 													__m128i const xmmCandidateClear = _mm_andnot_si128(xmmNotNumberNull, xmmCandidateSet);
 
-													__m128i const xmmCandidateNew = _mm_andnot_si128(xmmCandidateClear, std::get<i.value>(axmmCandidateSetABC));
+													__m128i const xmmCandidateNew = _mm_andnot_si128(xmmCandidateClear, std::get<i.value>(axmmNewCandidateSet));
 
-													__m128i const xmmCandidateSame = _mm_cmpeq_epi32(std::get<i.value>(axmmCandidateSetABC), xmmCandidateNew);
+													__m128i const xmmCandidateSame = _mm_cmpeq_epi32(std::get<i.value>(axmmNewCandidateSet), xmmCandidateNew);
 
-													std::get<i.value>(axmmCandidateSetABC) = xmmCandidateNew;
+													std::get<i.value>(axmmNewCandidateSet) = xmmCandidateNew;
 
-													std::get<i.value>(axmmGroupSetABC) = _mm_and_si128(xmmCandidateSame, std::get<i.value>(axmmGroupSetABC));
+													std::get<i.value>(axmmNoChangeGroupSet) = _mm_and_si128(xmmCandidateSame, std::get<i.value>(axmmNoChangeGroupSet));
 												});
 											}
 										}
@@ -164,19 +208,19 @@ namespace jrmwng
 						}
 						sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 						{
-							__m128i const xmmGroupMask = _mm_cmpeq_epi32(std::get<i.value>(axmmGroupSetABC), _mm_setzero_si128());
+							__m128i const xmmGroupMask = _mm_cmpeq_epi32(std::get<i.value>(axmmNoChangeGroupSet), _mm_setzero_si128());
 
-							__m128i const xmmGroupSet = _mm_xor_si128(std::get<i.value>(axmmGroupSetABC), std::get<i.value>(axmmGroupSet));
+							__m128i const xmmGroupSet = _mm_xor_si128(std::get<i.value>(axmmNoChangeGroupSet), std::get<i.value>(axmmOriginalGroupSet));
 
 							int const nGroupMask = _mm_movemask_epi8(xmmGroupMask) & 0xFFF;
 
-							xmmGroupSet1 = _mm_or_si128(xmmGroupSet1, xmmGroupSet);
+							xmmDirtyGroupSet = _mm_or_si128(xmmDirtyGroupSet, xmmGroupSet);
 
 							if (nGroupMask)
 							{
 								sudoku_for_each(std::make_index_sequence<3>(), [&](auto const j)
 								{
-									astNumber[stGroup.alNumberIndex[i * 3 + j]].lCandidateSet = _mm_extract_epi32(std::get<i.value>(axmmCandidateSetABC), j.value);
+									astCell[stDirtyGroup.alCellIndex[i * 3 + j]].lCandidateSet = _mm_extract_epi32(std::get<i.value>(axmmNewCandidateSet), j.value);
 								});
 							}
 						});
@@ -191,9 +235,9 @@ namespace jrmwng
 
 								for (unsigned long ulNumberIndex1; _BitScanForward(&ulNumberIndex1, lNumberSet1); _bittestandreset(&lNumberSet1, ulNumberIndex1))
 								{
-									auto const & stNumber = astNumber[stGroup.alNumberIndex[ulNumberIndex1]];
+									auto const & stCell = astCell[stDirtyGroup.alCellIndex[ulNumberIndex1]];
 
-									lCandidateSet0 |= stNumber.lCandidateSet;
+									lCandidateSet0 |= stCell.lCandidateSet;
 								}
 							}
 							if (__popcnt(lCandidateSet0) == __popcnt(lNumberSet0)) // the only condition of inference
@@ -201,12 +245,12 @@ namespace jrmwng
 								long lNumberSet2 = (~lNumberSet0) & ((1 << TT::SUDOKU_CANDIDATE_COUNT) - 1);
 								for (unsigned long ulNumberIndex2; _BitScanForward(&ulNumberIndex2, lNumberSet2); _bittestandreset(&lNumberSet2, ulNumberIndex2))
 								{
-									auto & stNumber = astNumber[stGroup.alNumberIndex[ulNumberIndex2]];
+									auto & stCell = astCell[stDirtyGroup.alCellIndex[ulNumberIndex2]];
 
-									if (stNumber.lCandidateSet & lCandidateSet0)
+									if (stCell.lCandidateSet & lCandidateSet0)
 									{
-										xmmGroupSet1 = _mm_or_si128(xmmGroupSet1, _mm_cvtsi32_si128(stNumber.lGroupSet));
-										stNumber.lCandidateSet &= ~lCandidateSet0;
+										xmmDirtyGroupSet = _mm_or_si128(xmmDirtyGroupSet, _mm_cvtsi32_si128(stCell.lGroupSet));
+										stCell.lCandidateSet &= ~lCandidateSet0;
 									}
 								}
 							}
@@ -217,14 +261,14 @@ namespace jrmwng
 		}
 		long set(unsigned uX, unsigned uY, unsigned uZ)
 		{
-			auto & stNumber = astNumber[uX + uY * TT::SUDOKU_CANDIDATE_COUNT];
+			auto & stCell = astCell[uX + uY * TT::SUDOKU_CANDIDATE_COUNT];
 
 			if (uZ-- > 0)
 			{
-				if (stNumber.lCandidateSet != (1 << uZ))
+				if (stCell.lCandidateSet != (1 << uZ))
 				{
-					stNumber.lCandidateSet = (1 << uZ);
-					return stNumber.lGroupSet;
+					stCell.lCandidateSet = (1 << uZ);
+					return stCell.lGroupSet;
 				}
 			}
 			return 0;

@@ -8,9 +8,9 @@
 #include <memory>
 #include <chrono>
 
-std::ostream & operator<< (std::ostream & os, jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>::number_t const & stSudokuNumber)
+std::ostream & operator<< (std::ostream & os, jrmwng::sudoku_t<jrmwng::sudoku_9x9_traits>::cell_t const & stCell)
 {
-	long lCandidateSet = stSudokuNumber.lCandidateSet;
+	long lCandidateSet = stCell.lCandidateSet;
 
 	unsigned long ulCandidateIndex0;
 	unsigned long ulCandidateIndex1;
@@ -38,7 +38,7 @@ std::ostream & operator<< (std::ostream & os, jrmwng::sudoku_t<jrmwng::sudoku_9x
 			{
 				for (int x1 = 0; x1 < 3; x1++)
 				{
-					std::cout << stSudoku.astNumber[(x0 + x1) + (y0 + y1) * 9];
+					std::cout << stSudoku.astCell[(x0 + x1) + (y0 + y1) * 9];
 				}
 				std::cout << std::ends;
 			}
