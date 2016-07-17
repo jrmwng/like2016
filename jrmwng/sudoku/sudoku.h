@@ -140,10 +140,13 @@ namespace jrmwng
 
 					if (stDirtyGroup.lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
 					{
+						//TT::printf(L"Clean-Group: %lu\n", ulDirtyGroupIndex);
 						continue;
 					}
-
-					TT::printf(L"Dirty-Group: %lu\n", ulDirtyGroupIndex);
+					else
+					{
+						TT::printf(L"Dirty-Group: %lu\n", ulDirtyGroupIndex);
+					}
 
 					if (TT::SUDOKU_GROUP_CELL_COUNT == 9)
 					{
@@ -193,12 +196,13 @@ namespace jrmwng
 								std::get<i.value>(axmmCellGroupSet) = xmmCellGroupSet;
 								std::get<i.value>(axmmCellCandidateSet) = xmmCellCandidateSet;
 
-								TT::printf(L"%S[%u]:\n\t%08X %08X %08X %08X\n", "axmmUnionCandidateSet", i.value, xmmUnionCandidateSet.m128i_u32[0], xmmUnionCandidateSet.m128i_u32[1], xmmUnionCandidateSet.m128i_u32[2], xmmUnionCandidateSet.m128i_u32[3]);
+								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X %08X\n", "axmmUnionCandidateSet", i.value, xmmUnionCandidateSet.m128i_u32[0], xmmUnionCandidateSet.m128i_u32[1], xmmUnionCandidateSet.m128i_u32[2], xmmUnionCandidateSet.m128i_u32[3]);
 								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellGroupSet", i.value, xmmCellGroupSet.m128i_u32[0], xmmCellGroupSet.m128i_u32[1], xmmCellGroupSet.m128i_u32[2]);
-								TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
+								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
 							});
 							if (stDirtyGroup.lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
 							{
+								TT::printf(L"Clean-Group: %lu\n", ulDirtyGroupIndex);
 								continue;
 							}
 						}
@@ -293,10 +297,15 @@ namespace jrmwng
 									stDirtyGroup.lCompleteGroupCellSet |= ((__popcnt(lCandidateSet) == 1) << uGroupCellIndex);
 								});
 
-								TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
+								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
 							});
 
 							xmmDirtyGroupSet = _mm_or_si128(xmmDirtyGroupSet, xmmLocalDirtyGroupSet);
+
+							if (stDirtyGroup.lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
+							{
+								TT::printf(L"Clean-Group: %lu\n", ulDirtyGroupIndex);
+							}
 
 							tFunc();
 						}
