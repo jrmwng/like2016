@@ -19,6 +19,15 @@ namespace jrmwng
 				(std::forward<Tfunc>(tFunc)(std::integral_constant<Tint, tInt>()), 0)...
 			};
 		}
+		template <typename T, typename Tint, Tint... tInt, typename Tfunc>
+		T sudoku_accumulate(std::integer_sequence<Tint, tInt...>, T tAccumulator, Tfunc && tFunc)
+		{
+			using type = int [];
+			(void) type {
+				(tAccumulator = std::forward<Tfunc>(tFunc)(std::integral_constant<Tint, tInt>(), tAccumulator), 0)...
+			};
+			return tAccumulator;
+		}
 	}
 	struct sudoku_9x9_traits
 	{
@@ -112,7 +121,7 @@ namespace jrmwng
 		void update(long lDirtyGroupSet)
 		{
 			// loop for dirty group-set
-			for (__m128i xmmDirtyGroupSet = _mm_setzero_si128(); lDirtyGroupSet; lDirtyGroupSet = ((1 << TT::SUDOKU_GROUP_COUNT) - 1) & std::accumulate(std::cbegin(xmmDirtyGroupSet.m128i_i32), std::cend(xmmDirtyGroupSet.m128i_i32), 0, std::bit_or<int>()), xmmDirtyGroupSet = _mm_setzero_si128())
+			for (__m128i xmmDirtyGroupSet; xmmDirtyGroupSet = _mm_setzero_si128(), lDirtyGroupSet; lDirtyGroupSet = ((1 << TT::SUDOKU_GROUP_COUNT) - 1) & sudoku_accumulate(std::make_integer_sequence<int, 4>(), 0, [&](auto const nIndex, int n)->int {return n | _mm_extract_epi32(xmmDirtyGroupSet, nIndex.value); }))
 			{
 				TT::printf(L"Dirty-Group-Set: %X\n", lDirtyGroupSet);
 
