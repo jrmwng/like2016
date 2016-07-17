@@ -87,17 +87,11 @@ namespace jrmwng
 		{
 			// index of astCell
 			unsigned auGridCellIndex[TT::SUDOKU_GROUP_CELL_COUNT]; // 9 numbers in each group
-			//
-			long lCompleteGroupCellSet;
 		}
 		astGridGroup[TT::SUDOKU_GRID_GROUP_COUNT];
 
 		sudoku_t(void)
 		{
-			std::for_each(std::begin(astGridGroup), std::end(astGridGroup), [&](group_t & stGroup)
-			{
-				stGroup.lCompleteGroupCellSet = 0;
-			});
 			for (unsigned y0 = 0; y0 < TT::SUDOKU_SIZE; y0++)
 			{
 				for (unsigned y1 = 0; y1 < TT::SUDOKU_SIZE; y1++)
@@ -128,25 +122,19 @@ namespace jrmwng
 		template <typename Tfunc>
 		void update(long lDirtyGroupSet, Tfunc && tFunc)
 		{
+			long lCleanGroupSet = 0;
+
 			// loop for dirty group-set
 			for (__m128i xmmDirtyGroupSet; xmmDirtyGroupSet = _mm_setzero_si128(), lDirtyGroupSet; lDirtyGroupSet = ((1 << TT::SUDOKU_GRID_GROUP_COUNT) - 1) & sudoku_accumulate(std::make_integer_sequence<int, 4>(), 0, [&](auto const nIndex, int n)->int {return n | _mm_extract_epi32(xmmDirtyGroupSet, nIndex.value); }))
 			{
-				TT::printf(L"Dirty-Group-Set: %X\n", lDirtyGroupSet);
+				TT::printf(L"Dirty-Group-Set: %X\n", _andn_u32(lCleanGroupSet, lDirtyGroupSet));
 
 				// for each dirty group
-				for (unsigned long ulDirtyGroupIndex; _BitScanForward(&ulDirtyGroupIndex, lDirtyGroupSet); _bittestandreset(&lDirtyGroupSet, ulDirtyGroupIndex))
+				for (unsigned long ulDirtyGroupIndex; _BitScanForward(&ulDirtyGroupIndex, _andn_u32(lCleanGroupSet, lDirtyGroupSet)); _bittestandreset(&lDirtyGroupSet, ulDirtyGroupIndex))
 				{
 					auto & stDirtyGroup = astGridGroup[ulDirtyGroupIndex];
 
-					if (stDirtyGroup.lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
-					{
-						//TT::printf(L"Clean-Group: %lu\n", ulDirtyGroupIndex);
-						continue;
-					}
-					else
-					{
-						TT::printf(L"Dirty-Group: %lu\n", ulDirtyGroupIndex);
-					}
+					TT::printf(L"Dirty-Group: %lu\n", ulDirtyGroupIndex);
 
 					if (TT::SUDOKU_GROUP_CELL_COUNT == 9)
 					{
@@ -157,15 +145,17 @@ namespace jrmwng
 						// candidate set of individual cell
 						std::tuple<__m128i, __m128i, __m128i> axmmCellCandidateSet;
 						{
+							long lCompleteGroupCellSet = 0;
+
 							sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 							{
 								long const lCellCandidateSet147 = astGridCell[stDirtyGroup.auGridCellIndex[i * 3 + 0]].lCandidateSet;
 								long const lCellCandidateSet258 = astGridCell[stDirtyGroup.auGridCellIndex[i * 3 + 1]].lCandidateSet;
 								long const lCellCandidateSet369 = astGridCell[stDirtyGroup.auGridCellIndex[i * 3 + 2]].lCandidateSet;
 
-								stDirtyGroup.lCompleteGroupCellSet |= ((__popcnt(lCellCandidateSet147) == 1) << (i * 3 + 0));
-								stDirtyGroup.lCompleteGroupCellSet |= ((__popcnt(lCellCandidateSet258) == 1) << (i * 3 + 1));
-								stDirtyGroup.lCompleteGroupCellSet |= ((__popcnt(lCellCandidateSet369) == 1) << (i * 3 + 2));
+								lCompleteGroupCellSet |= ((__popcnt(lCellCandidateSet147) == 1) << (i * 3 + 0));
+								lCompleteGroupCellSet |= ((__popcnt(lCellCandidateSet258) == 1) << (i * 3 + 1));
+								lCompleteGroupCellSet |= ((__popcnt(lCellCandidateSet369) == 1) << (i * 3 + 2));
 
 								// alCell[0].lCandidateSet 0 alCell[0].lCandidateSet 0 alCell[0].lCandidateSet 0 alCell[0].lCandidateSet 0
 								// [123456789] [] [123456789] [] [123456789] [] [123456789] []
@@ -200,8 +190,10 @@ namespace jrmwng
 								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellGroupSet", i.value, xmmCellGroupSet.m128i_u32[0], xmmCellGroupSet.m128i_u32[1], xmmCellGroupSet.m128i_u32[2]);
 								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
 							});
-							if (stDirtyGroup.lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
+							if (lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
 							{
+								_bittestandset(&lCleanGroupSet, ulDirtyGroupIndex);
+
 								TT::printf(L"Clean-Group: %lu\n", ulDirtyGroupIndex);
 								continue;
 							}
@@ -283,6 +275,8 @@ namespace jrmwng
 						xmmLocalDirtyGroupSet = _mm_and_si128(xmmLocalDirtyGroupSet, _mm_set1_epi32((1 << TT::SUDOKU_GRID_GROUP_COUNT) - 1));
 						if (_mm_movemask_epi8(_mm_cmpeq_epi32(xmmLocalDirtyGroupSet, _mm_setzero_si128())) != 0xFFFF)
 						{
+							long lCompleteGroupCellSet = 0;
+
 							sudoku_for_each(std::make_integer_sequence<unsigned, 3>(), [&](auto const i)
 							{
 								__m128i const xmmCellCandidateSet = std::get<i.value>(axmmCellCandidateSet);
@@ -294,7 +288,7 @@ namespace jrmwng
 									unsigned const uGridCellIndex = stDirtyGroup.auGridCellIndex[uGroupCellIndex];
 
 									astGridCell[uGridCellIndex].lCandidateSet = lCandidateSet;
-									stDirtyGroup.lCompleteGroupCellSet |= ((__popcnt(lCandidateSet) == 1) << uGroupCellIndex);
+									lCompleteGroupCellSet |= ((__popcnt(lCandidateSet) == 1) << uGroupCellIndex);
 								});
 
 								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
@@ -302,8 +296,10 @@ namespace jrmwng
 
 							xmmDirtyGroupSet = _mm_or_si128(xmmDirtyGroupSet, xmmLocalDirtyGroupSet);
 
-							if (stDirtyGroup.lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
+							if (lCompleteGroupCellSet == ((1 << TT::SUDOKU_GROUP_CELL_COUNT) - 1))
 							{
+								_bittestandset(&lCleanGroupSet, ulDirtyGroupIndex);
+
 								TT::printf(L"Clean-Group: %lu\n", ulDirtyGroupIndex);
 							}
 
