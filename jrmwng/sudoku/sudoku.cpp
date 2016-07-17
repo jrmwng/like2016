@@ -38,7 +38,7 @@ std::ostream & operator<< (std::ostream & os, jrmwng::sudoku_t<jrmwng::sudoku_9x
 			{
 				for (int x1 = 0; x1 < 3; x1++)
 				{
-					std::cout << stSudoku.astCell[(x0 + x1) + (y0 + y1) * 9];
+					std::cout << stSudoku.astGridCell[(x0 + x1) + (y0 + y1) * 9];
 				}
 				std::cout << std::ends;
 			}
