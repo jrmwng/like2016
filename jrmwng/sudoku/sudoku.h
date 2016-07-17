@@ -114,6 +114,8 @@ namespace jrmwng
 			// loop for dirty group-set
 			for (__m128i xmmDirtyGroupSet = _mm_setzero_si128(); lDirtyGroupSet; lDirtyGroupSet = ((1 << TT::SUDOKU_GROUP_COUNT) - 1) & std::accumulate(std::cbegin(xmmDirtyGroupSet.m128i_i32), std::cend(xmmDirtyGroupSet.m128i_i32), 0, std::bit_or<int>()), xmmDirtyGroupSet = _mm_setzero_si128())
 			{
+				TT::printf(L"Dirty-Group-Set: %X\n", lDirtyGroupSet);
+
 				// for each dirty group
 				for (unsigned long ulDirtyGroupIndex; _BitScanForward(&ulDirtyGroupIndex, lDirtyGroupSet); _bittestandreset(&lDirtyGroupSet, ulDirtyGroupIndex))
 				{
