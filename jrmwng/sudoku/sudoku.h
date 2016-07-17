@@ -100,7 +100,7 @@ namespace jrmwng
 		void update(long lDirtyGroupSet)
 		{
 			// loop for dirty group-set
-			for (__m128i xmmDirtyGroupSet = _mm_setzero_si128(); lDirtyGroupSet; lDirtyGroupSet = std::accumulate(std::cbegin(xmmDirtyGroupSet.m128i_i32), std::cend(xmmDirtyGroupSet.m128i_i32), 0, std::bit_or<int>()), xmmDirtyGroupSet = _mm_setzero_si128())
+			for (__m128i xmmDirtyGroupSet = _mm_setzero_si128(); lDirtyGroupSet; lDirtyGroupSet = ((1 << TT::SUDOKU_GROUP_COUNT) - 1) & std::accumulate(std::cbegin(xmmDirtyGroupSet.m128i_i32), std::cend(xmmDirtyGroupSet.m128i_i32), 0, std::bit_or<int>()), xmmDirtyGroupSet = _mm_setzero_si128())
 			{
 				// for each dirty group
 				for (unsigned long ulDirtyGroupIndex; _BitScanForward(&ulDirtyGroupIndex, lDirtyGroupSet); _bittestandreset(&lDirtyGroupSet, ulDirtyGroupIndex))
@@ -110,9 +110,8 @@ namespace jrmwng
 					if (TT::SUDOKU_CANDIDATE_COUNT == 9)
 					{
 						std::tuple<__m128i, __m128i, __m128i> axmmCombinedCandidateSet;
-						std::tuple<__m128i, __m128i, __m128i> axmmNoChangeGroupSet;
-						std::tuple<__m128i, __m128i, __m128i> axmmOriginalGroupSet;
-						std::tuple<__m128i, __m128i, __m128i> axmmNewCandidateSet;
+						std::tuple<__m128i, __m128i, __m128i> axmmCellGroupSet;
+						std::tuple<__m128i, __m128i, __m128i> axmmCellCandidateSet;
 						{
 							sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 							{
@@ -134,20 +133,20 @@ namespace jrmwng
 								// 0 alCell[2].lGroupSet alCell[1].lGroupSet alCell[0].lGroupSet
 								// 0 box[0]col[2]row[0] box[0]col[1]row[0] box[0]col[0]row[0]
 								// 0 40801 40401 40201
-								__m128i const xmmGroupSet = _mm_set_epi32(0, astCell[stDirtyGroup.alCellIndex[i * 3 + 2]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 1]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 0]].lGroupSet);
+								__m128i const xmmCellGroupSet = _mm_set_epi32(0, astCell[stDirtyGroup.alCellIndex[i * 3 + 2]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 1]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 0]].lGroupSet);
 
 
 								std::get<i.value>(axmmCombinedCandidateSet) = xmmCombinedCandidateSet;
-								std::get<i.value>(axmmOriginalGroupSet) = xmmGroupSet;
-								std::get<i.value>(axmmNoChangeGroupSet) = xmmGroupSet;
+								std::get<i.value>(axmmCellGroupSet) = xmmCellGroupSet;
 
 								// 0000 0000 0000 0000 0000 0000 0000 01FF
 								// 0000 0000 0000 0000 0000 01FF 0000 0000
 								// 0000 0000 0000 01FF 0000 0000 0000 0000
-								std::get<i.value>(axmmNewCandidateSet) = _mm_and_si128(_mm_shufflelo_epi16(xmmCombinedCandidateSet, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
+								std::get<i.value>(axmmCellCandidateSet) = _mm_and_si128(_mm_shufflelo_epi16(xmmCombinedCandidateSet, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
 							});
 						}
 
+						__m128i xmmLocalDirtyGroupSet = _mm_setzero_si128();
 						for (long lCellSet789 = 0; lCellSet789 < (1 << TT::SUDOKU_CANDIDATE_COUNT); lCellSet789 += (1 << 6), std::get<2>(axmmCombinedCandidateSet) = _mm_alignr_epi8(std::get<2>(axmmCombinedCandidateSet), std::get<2>(axmmCombinedCandidateSet), 2))
 						{
 							long const lCandidateSet789 = _mm_extract_epi16(std::get<2>(axmmCombinedCandidateSet), 0);
@@ -192,13 +191,15 @@ namespace jrmwng
 
 													__m128i const xmmClearCandidateInOtherCell = _mm_and_si128(xmmOtherCellMask, xmmCandidateSet);
 
-													__m128i const xmmNewCandidateSet = _mm_andnot_si128(xmmClearCandidateInOtherCell, std::get<i.value>(axmmNewCandidateSet));
+													__m128i const xmmNewCandidateSet = _mm_andnot_si128(xmmClearCandidateInOtherCell, std::get<i.value>(axmmCellCandidateSet));
 
-													__m128i const xmmNoChangeGroupMask = _mm_cmpeq_epi32(std::get<i.value>(axmmNewCandidateSet), xmmNewCandidateSet);
+													__m128i const xmmChangeGroupMask = _mm_cmplt_epi32(xmmNewCandidateSet, std::get<i.value>(axmmCellCandidateSet)); // because bit-31 is not used
 
-													std::get<i.value>(axmmNewCandidateSet) = xmmNewCandidateSet;
+													std::get<i.value>(axmmCellCandidateSet) = xmmNewCandidateSet;
 
-													std::get<i.value>(axmmNoChangeGroupSet) = _mm_and_si128(xmmNoChangeGroupMask, std::get<i.value>(axmmNoChangeGroupSet));
+													__m128i const xmmChangeGroupSet = _mm_and_si128(xmmChangeGroupMask, std::get<i.value>(axmmCellGroupSet));
+
+													xmmLocalDirtyGroupSet = _mm_or_si128(xmmLocalDirtyGroupSet, xmmChangeGroupSet);
 												});
 											}
 										}
@@ -206,24 +207,18 @@ namespace jrmwng
 								}
 							}
 						}
-						sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
+						xmmLocalDirtyGroupSet = _mm_and_si128(xmmLocalDirtyGroupSet, _mm_set1_epi32((1 << TT::SUDOKU_GROUP_COUNT) - 1));
+						if (_mm_movemask_epi8(_mm_cmpeq_epi32(xmmLocalDirtyGroupSet, _mm_setzero_si128())) != 0xFFFF)
 						{
-							__m128i const xmmChangeGroupMask = _mm_cmpeq_epi32(std::get<i.value>(axmmNoChangeGroupSet), _mm_setzero_si128());
-
-							__m128i const xmmGroupSet = _mm_xor_si128(std::get<i.value>(axmmNoChangeGroupSet), std::get<i.value>(axmmOriginalGroupSet));
-
-							int const nChangeGroupMask = _mm_movemask_epi8(xmmChangeGroupMask) & 0xFFF;
-
-							xmmDirtyGroupSet = _mm_or_si128(xmmDirtyGroupSet, xmmGroupSet);
-
-							if (nChangeGroupMask)
+							sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 							{
 								sudoku_for_each(std::make_index_sequence<3>(), [&](auto const j)
 								{
-									astCell[stDirtyGroup.alCellIndex[i * 3 + j]].lCandidateSet = _mm_extract_epi32(std::get<i.value>(axmmNewCandidateSet), j.value);
+									astCell[stDirtyGroup.alCellIndex[i * 3 + j]].lCandidateSet = _mm_extract_epi32(std::get<i.value>(axmmCellCandidateSet), j.value);
 								});
-							}
-						});
+							});
+							xmmDirtyGroupSet = _mm_or_si128(xmmDirtyGroupSet, xmmLocalDirtyGroupSet);
+						}
 					}
 					else // general case follows
 					{
