@@ -97,7 +97,12 @@ int main()
 			auto stSudoku = *upSudoku;
 			auto tp0 = std::chrono::steady_clock::now();
 			unsigned long long uxl0 = __rdtsc();
-			stSudoku.update(lGroupSet);
+			stSudoku.update(lGroupSet, [&]()
+			{
+#ifdef _DEBUG
+				std::cout << stSudoku;
+#endif
+			});
 			unsigned long long uxl1 = __rdtsc();
 			auto tp1 = std::chrono::steady_clock::now();
 			std::cout << stSudoku;
