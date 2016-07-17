@@ -132,7 +132,7 @@ namespace jrmwng
 				// for each dirty group
 				for (unsigned long ulDirtyGroupIndex; _BitScanForward(&ulDirtyGroupIndex, _andn_u32(lCleanGroupSet, lDirtyGroupSet)); _bittestandreset(&lDirtyGroupSet, ulDirtyGroupIndex))
 				{
-					auto & stDirtyGroup = astGridGroup[ulDirtyGroupIndex];
+					auto const & stDirtyGroup = astGridGroup[ulDirtyGroupIndex];
 
 					TT::printf(L"Dirty-Group: %lu\n", ulDirtyGroupIndex);
 
