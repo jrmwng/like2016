@@ -3,6 +3,7 @@
 /* Author: jrmwng @ 2015~2016 */
 
 #include <intrin.h>
+#include <stdarg.h>
 #include <numeric>
 #include <functional>
 
@@ -31,6 +32,17 @@ namespace jrmwng
 			// 27 groups = 9 box groups + 9 row groups + 9 column groups
 			SUDOKU_GROUP_COUNT = 27,
 		};
+
+		static void printf(wchar_t const *pcFormat, ...)
+		{
+#ifdef _DEBUG
+			va_list pArgs;
+
+			va_start(pArgs, pcFormat);
+			vwprintf_s(pcFormat, pArgs);
+			va_end(pArgs);
+#endif
+		}
 	};
 
 	template <typename TT>
@@ -107,6 +119,8 @@ namespace jrmwng
 				{
 					auto const & stDirtyGroup = astGroup[ulDirtyGroupIndex];
 
+					TT::printf(L"Dirty-Group: %lu\n", ulDirtyGroupIndex);
+
 					if (TT::SUDOKU_CANDIDATE_COUNT == 9)
 					{
 						// union set of candidate sets of selected cell(s)
@@ -138,14 +152,18 @@ namespace jrmwng
 								// 0 40801 40401 40201
 								__m128i const xmmCellGroupSet = _mm_set_epi32(0, astCell[stDirtyGroup.alCellIndex[i * 3 + 2]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 1]].lGroupSet, astCell[stDirtyGroup.alCellIndex[i * 3 + 0]].lGroupSet);
 
-
-								std::get<i.value>(axmmUnionCandidateSet) = xmmUnionCandidateSet;
-								std::get<i.value>(axmmCellGroupSet) = xmmCellGroupSet;
-
 								// 0000 0000 0000 0000 0000 0000 0000 01FF
 								// 0000 0000 0000 0000 0000 01FF 0000 0000
 								// 0000 0000 0000 01FF 0000 0000 0000 0000
-								std::get<i.value>(axmmCellCandidateSet) = _mm_and_si128(_mm_shufflelo_epi16(xmmUnionCandidateSet, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
+								__m128i const xmmCellCandidateSet = _mm_and_si128(_mm_shufflelo_epi16(xmmUnionCandidateSet, _MM_SHUFFLE(0, 2, 0, 1)), _mm_set_epi32(0, 0xFFFF, ~0, ~0));
+
+								std::get<i.value>(axmmUnionCandidateSet) = xmmUnionCandidateSet;
+								std::get<i.value>(axmmCellGroupSet) = xmmCellGroupSet;
+								std::get<i.value>(axmmCellCandidateSet) = xmmCellCandidateSet;
+
+								TT::printf(L"%S[%u]:\n\t%08X %08X %08X %08X\n", "axmmUnionCandidateSet", i.value, xmmUnionCandidateSet.m128i_u32[0], xmmUnionCandidateSet.m128i_u32[1], xmmUnionCandidateSet.m128i_u32[2], xmmUnionCandidateSet.m128i_u32[3]);
+								//TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellGroupSet", i.value, xmmCellGroupSet.m128i_u32[0], xmmCellGroupSet.m128i_u32[1], xmmCellGroupSet.m128i_u32[2]);
+								TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
 							});
 						}
 
@@ -227,11 +245,18 @@ namespace jrmwng
 						{
 							sudoku_for_each(std::make_index_sequence<3>(), [&](auto const i)
 							{
+								__m128i const xmmCellCandidateSet = std::get<i.value>(axmmCellCandidateSet);
+
 								sudoku_for_each(std::make_index_sequence<3>(), [&](auto const j)
 								{
-									astCell[stDirtyGroup.alCellIndex[i * 3 + j]].lCandidateSet = _mm_extract_epi32(std::get<i.value>(axmmCellCandidateSet), j.value);
+									long const lCandidateSet = _mm_extract_epi32(xmmCellCandidateSet, j.value);
+
+									astCell[stDirtyGroup.alCellIndex[i * 3 + j]].lCandidateSet = lCandidateSet;
 								});
+
+								TT::printf(L"%S[%u]:\n\t%08X %08X %08X\n", "axmmCellCandidateSet", i.value, xmmCellCandidateSet.m128i_u32[0], xmmCellCandidateSet.m128i_u32[1], xmmCellCandidateSet.m128i_u32[2]);
 							});
+
 							xmmDirtyGroupSet = _mm_or_si128(xmmDirtyGroupSet, xmmLocalDirtyGroupSet);
 						}
 					}
