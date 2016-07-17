@@ -226,11 +226,11 @@ namespace jrmwng
 													// 000001FF 00000000 000001FF 000001FF
 													__m128i const xmmClearCandidateOfInactiveCell = _mm_and_si128(xmmInactiveCellMask, xmmUnionCandidateSet);
 
-													__m128i const xmmNewCandidateSet = _mm_andnot_si128(xmmClearCandidateOfInactiveCell, std::get<i.value>(axmmCellCandidateSet));
+													__m128i const xmmNewCellCandidateSet = _mm_andnot_si128(xmmClearCandidateOfInactiveCell, std::get<i.value>(axmmCellCandidateSet));
 
-													__m128i const xmmChangeGroupMask = _mm_cmplt_epi32(xmmNewCandidateSet, std::get<i.value>(axmmCellCandidateSet)); // because bit-31 is not used and we are clearing bit(s)
+													__m128i const xmmChangeGroupMask = _mm_cmplt_epi32(xmmNewCellCandidateSet, std::get<i.value>(axmmCellCandidateSet)); // because bit-31 is not used and we are clearing bit(s)
 
-													std::get<i.value>(axmmCellCandidateSet) = xmmNewCandidateSet;
+													std::get<i.value>(axmmCellCandidateSet) = xmmNewCellCandidateSet;
 
 													__m128i const xmmChangeGroupSet = _mm_and_si128(xmmChangeGroupMask, std::get<i.value>(axmmCellGroupSet));
 
