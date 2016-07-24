@@ -2,29 +2,11 @@
 
 /* Author: jrmwng @ 2016 */
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
-	struct TaskStruct;
-	typedef TaskStruct * TASK_HANDLE;
-
-	void TASK_InitModule();
-	void TASK_FreeModule();
-
-	TASK_HANDLE TASK_Execute(void(*pfnTask)(void *pContext), void *pContext);
-	void TASK_Synchronize(TASK_HANDLE hTask);
-
-#ifdef __cplusplus
-}
-#endif
-
-#ifdef __cplusplus
 #include <memory>
 #include <tuple>
 #include <type_traits>
 #include <functional>
+
 namespace jrmwng
 {
 	class task_scheduler;
@@ -94,4 +76,3 @@ namespace jrmwng
 		}
 	};
 }
-#endif // __cplusplus
