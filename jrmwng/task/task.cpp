@@ -236,37 +236,64 @@ namespace jrmwng
 				uxlTsc4 - uxlTsc3, "cycles", hDoneEvent);
 			return true;
 		}
-		void synchronize(stream_bool & bDoneEvent, HANDLE hDoneEvent)
+		void synchronize(stream_bool & bDone, HANDLE hDoneEvent, stream_bool & bLock)
 		{
-			if (bDoneEvent.load(std::memory_order_relaxed) == false)
+			unsigned long long uxlTsc0 = __rdtsc();
+			unsigned long long uxlTsc1 = uxlTsc0;
+			unsigned long long uxlTsc2 = uxlTsc0;
+			unsigned long long uxlTsc3 = uxlTsc0;
+
+			if (bDone.load(std::memory_order_relaxed) == false)
 			{
 				if (ResetEvent(hDoneEvent) == FALSE)
 				{
 					__debugbreak();
 
-					while (bDoneEvent.load(std::memory_order_relaxed) == false)
+					while (bDone.load(std::memory_order_relaxed) == false)
 					{
 						Sleep(1);
 					}
 				}
 				else
 				{
+					uxlTsc1 = __rdtsc();
+					uxlTsc2 = uxlTsc1;
+					uxlTsc3 = uxlTsc1;
+
 					m_hDoneEvent.store(hDoneEvent, std::memory_order_relaxed);
 					_mm_clflush(this); // reduce stall time of worker thread
 					_mm_prefetch(reinterpret_cast<char const*>(this), _MM_HINT_T2);
 
 					//_mm_sfence();
-					if (bDoneEvent.load(std::memory_order_release))
+					if (bDone.load(std::memory_order_release))
 					{
+						uxlTsc2 = __rdtsc();
+						uxlTsc3 = uxlTsc2;
+
 						DWORD dwWait = WaitForSingleObject(hDoneEvent, INFINITE);
 
 						if (dwWait != WAIT_OBJECT_0)
 						{
 							__debugbreak();
 						}
+
+						uxlTsc3 = __rdtsc();
 					}
 				}
 			}
+
+			bLock.store(true, std::memory_order_release);
+
+			unsigned long long uxlTsc4 = __rdtsc();
+
+			g_pLogger->printf(
+				"%016I64X: %s: %I64u%s = %I64u%s + %I64u%s + %I64u%s + %I64u%s\n",
+				uxlTsc0, "user-sync",
+				uxlTsc4 - uxlTsc0, "cycles",
+				uxlTsc1 - uxlTsc0, "cycles",
+				uxlTsc2 - uxlTsc1, "cycles",
+				uxlTsc3 - uxlTsc2, "cycles",
+				uxlTsc4 - uxlTsc3, "cycles");
 		}
 	};
 	struct alignas(4096) task_scheduler_impl
@@ -475,9 +502,7 @@ namespace jrmwng
 
 				if (uIndex < MAX_NUM_OF_ITEM)
 				{
-					pstItem->synchronize(m_abDone[uIndex], m_ahDoneEvent[uIndex]);
-					//_mm_sfence();
-					m_abLock[uIndex].store(true, std::memory_order_release);
+					pstItem->synchronize(m_abDone[uIndex], m_ahDoneEvent[uIndex], m_abLock[uIndex]);
 					return true;
 				}
 			}
@@ -501,14 +526,7 @@ namespace jrmwng
 	}
 	bool task_scheduler::synchronize(task_scheduler::handle_t hTask)
 	{
-		unsigned long long const uxlTsc0 = __rdtsc();
-		auto bSync = m_pImpl->synchronize(hTask);
-		unsigned long long const uxlTsc1 = __rdtsc();
-		g_pLogger->printf(
-			"%016I64X: %s: %I64u%s\n",
-			uxlTsc0, "user-sync",
-			uxlTsc1 - uxlTsc0, "cycles");
-		return bSync;
+		return m_pImpl->synchronize(hTask);
 	}
 }
 
