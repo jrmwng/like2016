@@ -117,6 +117,7 @@ namespace
 			return dwWait == WAIT_OBJECT_0;
 		}
 	};
+	/*
 	struct stream_bool
 	{
 		int m_nValue;
@@ -134,7 +135,8 @@ namespace
 		void store(bool bNewValue, std::memory_order emMemoryOrder)
 		{
 			if (emMemoryOrder == std::memory_order_release ||
-				emMemoryOrder == std::memory_order_acq_rel)
+				emMemoryOrder == std::memory_order_acq_rel ||
+				emMemoryOrder == std::memory_order_seq_cst)
 			{
 				_mm_sfence();
 			}
@@ -158,7 +160,8 @@ namespace
 		bool load(std::memory_order emMemoryOrder) const
 		{
 			if (emMemoryOrder == std::memory_order_release ||
-				emMemoryOrder == std::memory_order_acq_rel)
+				emMemoryOrder == std::memory_order_acq_rel ||
+				emMemoryOrder == std::memory_order_seq_cst)
 			{
 				_mm_sfence();
 			}
@@ -175,6 +178,13 @@ namespace
 			return nValue != 0;
 		}
 	};
+	*/
+	using stream_bool = std::atomic_bool;
+
+	unsigned long long rdtsc()
+	{
+		return __rdtsc();
+	}
 }
 
 namespace jrmwng
@@ -200,24 +210,28 @@ namespace jrmwng
 			m_pContext = pContext;
 			m_pbDoneEvent = pbDoneEvent;
 			m_hDoneEvent.store(NULL, std::memory_order_relaxed);
-			_mm_clflush(this); // reduce stall time of worker thread
+			_mm_clflush(this);
+			_mm_prefetch(reinterpret_cast<char const*>(this), _MM_HINT_NTA); // 'this' will be read by another (worker) thread
 		}
 		bool execute()
 		{
-			unsigned long long const uxlTsc0 = __rdtsc();
+			unsigned long long const uxlTsc0 = rdtsc();
 			void(*pfnTask)(void*) = m_pfnTask;
 			void *pContext = m_pContext;
-			unsigned long long const uxlTsc1 = __rdtsc();
+			stream_bool *pbDoneEvent = m_pbDoneEvent;
+			unsigned long long const uxlTsc1 = rdtsc();
+
+			_mm_prefetch(reinterpret_cast<char const*>(pbDoneEvent), _MM_HINT_T0); // '*pbDoneEvent' will be written by this (worker) thread soon
 
 			pfnTask(pContext); // execute the actual work item
 
-			unsigned long long const uxlTsc2 = __rdtsc();
-			m_pbDoneEvent->store(true, std::memory_order_release);
-			_mm_clflush(m_pbDoneEvent);
-			_mm_prefetch(reinterpret_cast<char const*>(m_pbDoneEvent), _MM_HINT_T2); // reduce stall time of user thread
-			unsigned long long const uxlTsc3 = __rdtsc();
-
+			unsigned long long const uxlTsc2 = rdtsc();
+			pbDoneEvent->store(true, std::memory_order_release);
 			HANDLE hDoneEvent = m_hDoneEvent.load(std::memory_order_relaxed);
+			_mm_clflush(pbDoneEvent);
+			_mm_prefetch(reinterpret_cast<char const*>(pbDoneEvent), _MM_HINT_NTA); // '*pbDoneEvent' will be read by another (user) thread
+			unsigned long long const uxlTsc3 = rdtsc();
+
 			if (hDoneEvent)
 			{
 				if (SetEvent(hDoneEvent) == FALSE)
@@ -226,7 +240,7 @@ namespace jrmwng
 				}
 			}
 
-			unsigned long long const uxlTsc4 = __rdtsc();
+			unsigned long long const uxlTsc4 = rdtsc();
 
 			g_pLogger->printf("%016I64X: %s: %I64u%s = %I64u%s + %I64u%s + %I64u%s (%p)\n",
 				uxlTsc0, "work-done",
@@ -236,55 +250,47 @@ namespace jrmwng
 				uxlTsc4 - uxlTsc3, "cycles", hDoneEvent);
 			return true;
 		}
-		void synchronize(stream_bool & bDone, HANDLE hDoneEvent, stream_bool & bLock)
+		void synchronize(stream_bool & bDone, manual_event & hDoneEvent, stream_bool & bLock)
 		{
-			unsigned long long uxlTsc0 = __rdtsc();
+			unsigned long long uxlTsc0 = rdtsc();
 			unsigned long long uxlTsc1 = uxlTsc0;
 			unsigned long long uxlTsc2 = uxlTsc0;
 			unsigned long long uxlTsc3 = uxlTsc0;
 
 			if (bDone.load(std::memory_order_relaxed) == false)
 			{
-				if (ResetEvent(hDoneEvent) == FALSE)
+				_mm_prefetch(reinterpret_cast<char const*>(&m_hDoneEvent), _MM_HINT_T0); // 'm_hDoneEvent' will be written by this (user) thread
+
+				hDoneEvent.reset();
+
+				uxlTsc1 = rdtsc();
+				uxlTsc2 = uxlTsc1;
+				uxlTsc3 = uxlTsc1;
+
+				m_hDoneEvent.store(hDoneEvent, std::memory_order_relaxed);
+				_mm_clflush(&m_hDoneEvent);
+				_mm_prefetch(reinterpret_cast<char const*>(this), _MM_HINT_NTA); // 'm_hDoneEvent' will be read by another (worker) thread
+
+				//_mm_sfence();
+				if (bDone.load(std::memory_order_release) == false)
 				{
-					__debugbreak();
+					_mm_clflush(&bDone);
+					_mm_prefetch(reinterpret_cast<char const*>(&bDone), _MM_HINT_T2); // 'bDone' will be written by another (worker) thread
 
-					while (bDone.load(std::memory_order_relaxed) == false)
-					{
-						Sleep(1);
-					}
-				}
-				else
-				{
-					uxlTsc1 = __rdtsc();
-					uxlTsc2 = uxlTsc1;
-					uxlTsc3 = uxlTsc1;
+					uxlTsc2 = rdtsc();
+					uxlTsc3 = uxlTsc2;
 
-					m_hDoneEvent.store(hDoneEvent, std::memory_order_relaxed);
-					_mm_clflush(this); // reduce stall time of worker thread
-					_mm_prefetch(reinterpret_cast<char const*>(this), _MM_HINT_T2);
+					hDoneEvent.wait();
 
-					//_mm_sfence();
-					if (bDone.load(std::memory_order_release))
-					{
-						uxlTsc2 = __rdtsc();
-						uxlTsc3 = uxlTsc2;
-
-						DWORD dwWait = WaitForSingleObject(hDoneEvent, INFINITE);
-
-						if (dwWait != WAIT_OBJECT_0)
-						{
-							__debugbreak();
-						}
-
-						uxlTsc3 = __rdtsc();
-					}
+					uxlTsc3 = rdtsc();
 				}
 			}
 
-			bLock.store(true, std::memory_order_release);
+			bLock.store(false, std::memory_order_release);
+			_mm_clflush(&bLock);
+			_mm_prefetch(reinterpret_cast<char const*>(&bLock), _MM_HINT_T2); // 'bLock' will be accessed by another (user or worker) thread
 
-			unsigned long long uxlTsc4 = __rdtsc();
+			unsigned long long uxlTsc4 = rdtsc();
 
 			g_pLogger->printf(
 				"%016I64X: %s: %I64u%s = %I64u%s + %I64u%s + %I64u%s + %I64u%s\n",
@@ -299,7 +305,7 @@ namespace jrmwng
 	struct alignas(4096) task_scheduler_impl
 	{
 		enum { MAX_NUM_OF_THREAD = 3 };
-		enum { MAX_NUM_OF_ITEM = 32 };
+		enum { MAX_NUM_OF_ITEM = 64 };
 
 		using item_t = task_scheduler::item_t;
 
@@ -320,15 +326,18 @@ namespace jrmwng
 
 		alignas(128) item_t m_astItem[MAX_NUM_OF_ITEM];
 
-		alignas(128) stream_bool m_abLock[MAX_NUM_OF_ITEM];
-		alignas(128) stream_bool m_abExec[MAX_NUM_OF_ITEM];
-		alignas(128) stream_bool m_abDone[MAX_NUM_OF_ITEM];
+		alignas(128) stream_bool m_abLock[MAX_NUM_OF_ITEM]; // user threads access. user threads write
+		alignas(128) stream_bool m_abExec[MAX_NUM_OF_ITEM]; // user threads write. worker threads access
+		alignas(128) stream_bool m_abDone[MAX_NUM_OF_ITEM]; // user threads write. worker threads write. user threads read
 
 		task_scheduler_impl()
 			: m_bExitEvent(false)
 			, m_uWakeCount(0)
 		{
-			VirtualLock(this, sizeof(*this));
+			if (VirtualLock(this, sizeof(*this)) == FALSE)
+			{
+				__debugbreak();
+			}
 
 			for (size_t uIndex = 0; m_astThread + uIndex < std::end(m_astThread); uIndex++)
 			{
@@ -341,6 +350,7 @@ namespace jrmwng
 					}
 					else
 					{
+						// TODO: affinity mask, thread priority
 						if (ResumeThread(hThread) == FALSE)
 						{
 							__debugbreak();
@@ -379,7 +389,10 @@ namespace jrmwng
 				__debugbreak();
 			}
 
-			VirtualUnlock(this, sizeof(*this));
+			if (VirtualUnlock(this, sizeof(*this)) == FALSE)
+			{
+				__debugbreak();
+			}
 		}
 
 		void * operator new (size_t uSize)
@@ -405,17 +418,17 @@ namespace jrmwng
 					m_uWakeCount.fetch_add(1, std::memory_order_relaxed);
 					m_hWakeEvent.set();
 
-					unsigned long long uxlTsc0 = __rdtsc();
+					unsigned long long uxlTsc0 = rdtsc();
 					while (std::count_if(std::begin(m_abExec), std::end(m_abExec), [&](stream_bool & bExec)->bool
 					{
 						if (bExec.load(std::memory_order_relaxed) && bExec.exchange(0, std::memory_order_acquire))
 						{
-							unsigned long long uxlTsc1 = __rdtsc();
+							unsigned long long uxlTsc1 = rdtsc();
 							g_pLogger->printf("%016I64X: %s: %I64u%s\n", uxlTsc0, "work-find", uxlTsc1 - uxlTsc0, "cycles");
 
 							m_astItem[&bExec - m_abExec].execute();
 
-							uxlTsc0 = __rdtsc();
+							uxlTsc0 = rdtsc();
 							return true;
 						}
 						else
@@ -446,7 +459,7 @@ namespace jrmwng
 
 		item_t * execute(void(*pfnTask)(void *), void *pContext)
 		{
-			unsigned long long const uxlTsc0 = __rdtsc();
+			unsigned long long const uxlTsc0 = rdtsc();
 			_mm_prefetch(reinterpret_cast<char const*>(&m_uWakeCount), _MM_HINT_T0);
 
 			auto itLock = std::find_if(std::begin(m_abLock), std::end(m_abLock), [&](stream_bool & bLock)->bool
@@ -459,27 +472,31 @@ namespace jrmwng
 				}
 				else
 				{
-					unsigned long long const uxlTsc1 = __rdtsc();
+					unsigned long long const uxlTsc1 = rdtsc();
 
 					auto & stItem = m_astItem[uIndex];
 					{
 						stItem.setup(pfnTask, pContext, &m_abDone[uIndex], m_ahDoneEvent[uIndex]);
 					}
 
-					unsigned long long const uxlTsc2 = __rdtsc();
+					unsigned long long const uxlTsc2 = rdtsc();
 
 					m_abDone[uIndex].store(false, std::memory_order_relaxed);
-					//_mm_sfence();
-					m_abExec[uIndex].store(true, std::memory_order_release); // this statement follows preceeding writes
+					_mm_clflush(&m_abDone[uIndex]);
+					_mm_prefetch(reinterpret_cast<char const*>(&m_abDone[uIndex]), _MM_HINT_T2); // 'm_abDone[uIndex]' will be written by another (worker) thread
 
-					unsigned long long const uxlTsc3 = __rdtsc();
+					m_abExec[uIndex].store(true, std::memory_order_release); // this statement follows preceeding writes
+					_mm_clflush(&m_abExec[uIndex]);
+					_mm_prefetch(reinterpret_cast<char const*>(&m_abExec[uIndex]), _MM_HINT_T2); // 'm_abExec[uIndex]' will be access by another (worker) thread
+
+					unsigned long long const uxlTsc3 = rdtsc();
 
 					if (m_uWakeCount == 0)
 					{
 						m_hWakeEvent.set();
 					}
 
-					unsigned long long const uxlTsc4 = __rdtsc();
+					unsigned long long const uxlTsc4 = rdtsc();
 
 					g_pLogger->printf(
 						"%016I64X: %s: %I64u%s = %I64u%s + %I64u%s + %I64u%s + %I64u%s\n",
@@ -556,9 +573,9 @@ int main()
 		}
 		);
 
-		//Sleep(100);
+		Sleep(100);
 
-		auto sync1 = ts.for_each(std::make_integer_sequence<unsigned, 3>(), [&](auto const i)
+		auto sync1 = ts.for_each(std::make_integer_sequence<unsigned, 50>(), [&](auto const i)
 		{
 			printf("%u\n", i.value);
 		});
