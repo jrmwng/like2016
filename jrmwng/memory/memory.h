@@ -122,6 +122,28 @@ namespace jrmwng
 			0x00010001U, // 0x0E
 			0x00010001U, // 0x0F
 			0x00010001U, // 0x10
+			0x00000001U, // 0x11
+			0x00000001U, // 0x12
+			0x00000001U, // 0x13
+			0x00000001U, // 0x14
+			0x00000001U, // 0x15
+			0x00000001U, // 0x16
+			0x00000001U, // 0x17
+			0x00000001U, // 0x18
+			0x00000001U, // 0x19
+			0x00000001U, // 0x20
+			0x00000001U, // 0x21
+			0x00000001U, // 0x22
+			0x00000001U, // 0x23
+			0x00000001U, // 0x24
+			0x00000001U, // 0x25
+			0x00000001U, // 0x26
+			0x00000001U, // 0x27
+			0x00000001U, // 0x28
+			0x00000001U, // 0x29
+			0x00000001U, // 0x30
+			0x00000001U, // 0x31
+			0x00000001U, // 0x32
 		};
 		template <unsigned uGRANULARITY, unsigned u256X>
 		struct alignas(128) memory_heap
@@ -133,6 +155,8 @@ namespace jrmwng
 				unsigned volatile m_auBitLock[u256X * 8];
 				long volatile m_aalBitLock[u256X][8];
 				long volatile m_alBitLock[u256X * 8];
+				char volatile m_aacBitLock[u256X][32];
+				char volatile m_acBitLock[u256X * 32];
 			};
 
 			union
@@ -186,9 +210,10 @@ namespace jrmwng
 				size_t const uActualSize = sizeof(alloc_info) + uSize + uAlign - 1;
 
 				size_t const uCount1 = (uActualSize + uGRANULARITY - 1) / uGRANULARITY;
+				size_t const uCount8 = (uActualSize + uGRANULARITY * 8 - 1) / (uGRANULARITY * 8);
 				size_t const uCount32 = (uActualSize + uGRANULARITY * 32 - 1) / (uGRANULARITY * 32);
 
-				if (g_auAlignMask + uCount1 <= std::end(g_auAlignMask))
+				if (uCount1 <= 16)
 				{
 					unsigned const uAlignMask = g_auAlignMask[uCount1];
 
@@ -238,7 +263,7 @@ namespace jrmwng
 								{
 									unsigned const ulPattern = (1U << uCount1) - 1U;
 
-									for (unsigned uIndex1 = _tzcnt_u32(ulHitLockLSB); uIndex1 < 32; uIndex1 = _tzcnt_u32(ulHitLockLSB))
+									for (unsigned uIndex1 = _lzcnt_u32(ulHitLockLSB); uIndex1 < 32; uIndex1 = _lzcnt_u32(ulHitLockLSB))
 									{
 										unsigned volatile & ulBitLock = m_aauBitLock[uIndex256][uIndex32];
 										long volatile & lBitLock = m_aalBitLock[uIndex256][uIndex32];
@@ -273,76 +298,97 @@ namespace jrmwng
 						}
 					}
 				}
-				else
+				else if (uCount8 <= 32)
 				{
-					for (unsigned uIndex32 = 0; m_auBitLock + uIndex32 + uCount32 < std::end(m_auBitLock); uIndex32++)
-					{
-						if (std::all_of(m_auBitLock + uIndex32, m_auBitLock + uIndex32 + uCount32, [&](unsigned volatile & uBitLock)->bool
-						{
-							return ~uBitLock == 0U;
-						}))
-						{
-							unsigned const uIndex = uIndex32 * 32;
+					unsigned const uAlignMask8LSB = g_auAlignMask[uCount8];
+					unsigned const uAlignMask8MSB = RotateLeft32(uAlignMask8LSB, uCount8);
 
-							alloc_info *pstInfo = memory_align<alloc_info>(pcBuffer + uGranularity * uIndex + sizeof(alloc_info), uAlign) - 1;
+					unsigned auHitLock8[u256X];
+					{
+						unsigned char ubCarry = 0;
+						memory_transform(m_aymmBitLock, auHitLock8, [](__m256i const & ymmBitLock)->unsigned
+						{
+							__m256i const ub32OldLock = ymmBitLock;
+
+							__m256i const ub32CmpLock = _mm256_cmpeq_epi8(ub16OldLock, _mm256_set1_epi8(0xFF));
+
+							unsigned const uOldLock8 = _mm256_movemask_epi8(ub32CmpLock);
+
+							unsigned uAddLock8A;
+							ubCarry = _addcarryx_u32(ubCarry, uOldLock8, uAlignMask8LSB, &uAddLock8A);
+							unsigned const uXorLock8A = uOldLock8 ^ uAlignMask8LSB;
+
+							unsigned const uXorLock8B = uAddLock8A ^ uXorLock8A;
+
+							unsigned const uAndLock8C = uXorLock8B & uAlignMask8MSB;
+
+							return uAndLock8C;
+						});
+					}
+					for (unsigned uIndex256 = u256X; 0 < uIndex256--; )
+					{
+						unsigned const uHitLock8 = auHitLock8[uIndex256];
+
+						for (unsigned uIndex8 = _tzcnt_u32(uHitLock8); uIndex8 < 32; uIndex8 = _tzcnt_u32(uHitLock8))
+						{
+							uHitLock8 = _blsr_u32(uHitLock8);
+
+							unsigned const uIndex = uIndex256 * 256 + uIndex8 * 8 - 8;
+
+							alloc_info *pstInfo = memory_align<alloc_info>(pcBuffer + uGRANULARITY * uIndex + sizeof(alloc_info), uAlign) - 1;
 							{
 								_mm_prefetch(reinterpret_cast<char const*>(pstInfo), _MM_HINT_T0);
 
-								long volatile * const plBitLockBegin = m_alBitLock + uIndex32;
-								long volatile * const plBitLockEnd = m_alBitLock + uIndex32 + uCount32;
+								char volatile *pcBitLockBegin = m_aacBitLock[uIndex256] + uIndex8;
+								char volatile *pcBitLockEnd = m_aacBitLock[uIndex256] + uIndex8 + uCount8;
 
-								unsigned const uTSX = _xbegin();
+								unsigned const uXBEGIN = _xbegin();
 
-								if (uTSX == _XBEGIN_STARTED)
+								if (std::all_of(pcBitLockBegin, pcBitLockEnd, [&](char volatile & cBitLock)->bool
 								{
-									if (std::all_of(plBitLockBegin, plBitLockEnd, [&](long volatile & lBitLock)->bool
+									if (_xtest())
 									{
-										if (lBitLock == ~0L)
+										if (cBitLock == 0xFF)
 										{
-											lBitLock = 0L;
+											cBitLock = 0;
 											return true;
 										}
 										else
 										{
-											_xabort();
+											_xabort(0);
 											return false;
 										}
-									}))
+									}
+									else if (_InterlockedCompareExchange8(&cBitLock, 0, 0xFF) == 0xFF)
+									{
+										return true;
+									}
+									else
+									{
+										std::for_each(m_aacBitLock[uIndex256] + uIndex8, &cBitLock, [&](char volatile & cBitLock)
+										{
+											cBitLock = 0;
+										});
+										return false;
+									}
+								}))
+								{
+									if (uXBEGIN == _XBEGIN_STARTED)
 									{
 										_xend();
-										pstInfo->pHeap = this;
-										pstInfo->uIndex = uIndex;
-										pstInfo->uCount = uCount32 * 32;
-										return pstInfo + 1;
 									}
-								}
-								if (uTSX != _XABORT_EXPLICIT)
-								{
-									if (std::all_of(plBitLockBegin, plBitLockEnd, [&](long volatile & lBitLock)->bool
-									{
-										if (_InterlockedCompareExchange(&lBitLock, 0L, ~0L) == ~0L)
-										{
-											return true;
-										}
-										else
-										{
-											std::for_each(m_alBitLock + uIndex32, &lBitLock, [&](long volatile & lBitUnlock)->bool
-											{
-												lBitUnlock = ~0L;
-											});
-											return false;
-										}
-									}))
-									{
-										pstInfo->pHeap = this;
-										pstInfo->uIndex = uIndex;
-										pstInfo->uCount = uCount32 * 32;
-										return pstInfo + 1;
-									}
+									pstInfo->pHeap = this;
+									pstInfo->uIndex = uIndex;
+									pstInfo->uCount = uCount8 * 8;
+									return pstInfo + 1;
 								}
 							}
 						}
 					}
+				}
+				else
+				{
+					// NOP
 				}
 
 				return nullptr;
