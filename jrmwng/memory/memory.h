@@ -103,7 +103,7 @@ namespace jrmwng
 			}
 		};
 
-		static unsigned const g_auAlignMask [] =
+		alignas(64) static unsigned const g_auAlignMask [] =
 		{
 			0x00000000U, // 0x00
 			0xFFFFFFFFU, // 0x01
@@ -121,41 +121,10 @@ namespace jrmwng
 			0x00010001U, // 0x0D
 			0x00010001U, // 0x0E
 			0x00010001U, // 0x0F
-			0x00010001U, // 0x10
-			0x00000001U, // 0x11
-			0x00000001U, // 0x12
-			0x00000001U, // 0x13
-			0x00000001U, // 0x14
-			0x00000001U, // 0x15
-			0x00000001U, // 0x16
-			0x00000001U, // 0x17
-			0x00000001U, // 0x18
-			0x00000001U, // 0x19
-			0x00000001U, // 0x20
-			0x00000001U, // 0x21
-			0x00000001U, // 0x22
-			0x00000001U, // 0x23
-			0x00000001U, // 0x24
-			0x00000001U, // 0x25
-			0x00000001U, // 0x26
-			0x00000001U, // 0x27
-			0x00000001U, // 0x28
-			0x00000001U, // 0x29
-			0x00000001U, // 0x30
-			0x00000001U, // 0x31
-			0x00000001U, // 0x32
 		};
-		template <unsigned uGRANULARITY, unsigned u1X>
 		struct alignas(128) memory_heap
 		{
-			enum { u256X = (u1X + 255) / 256 };
-			enum { u128X = (u1X + 127) / 128 };
-			enum { u64X = (u1X + 63) / 64 };
-			enum { u32X = (u1X + 31) / 32 };
-			enum { u16X = (u1X + 15) / 16 };
-			enum { u8X = (u1X + 7) / 8 };
-			enum { u4X = (u1X + 3) / 4 };
-			enum { u2X = (u1X + 1) / 2 };
+			enum { u256X = 2 };
 			union
 			{
 				__m256i m_aymmBitLock[u256X];
@@ -176,17 +145,19 @@ namespace jrmwng
 				void * const m_pBuffer;
 				char * const m_pcBuffer;
 			};
+			size_t m_uGranularity;
 
 			memory_heap()
 			{
 				// NOP
 			}
-			memory_heap(void *pBuffer, unsigned uCount)
+			memory_heap(void *pBuffer, size_t uGranularity, unsigned uCapacity)
 				: m_pBuffer(pBuffer)
+				, m_uGranularity(uGranularity)
 			{
-				unsigned const uCount256 = uCount / 256U;
-				unsigned const uCount32 = (uCount % 256U) / 32U;
-				unsigned const uCount1 = (uCount % 256U) % 32U;
+				unsigned const uCount256 = uCapacity / 256U;
+				unsigned const uCount32 = (uCapacity % 256U) / 32U;
+				unsigned const uCount1 = (uCapacity % 256U) % 32U;
 
 				if (uCount256)
 				{
@@ -198,7 +169,7 @@ namespace jrmwng
 				}
 				if (uCount1)
 				{
-					m_aymmBitLock[uCount256].m256i_u32[uCount32] = (~0U) + (1U << uCount);
+					m_aymmBitLock[uCount256].m256i_u32[uCount32] = (~0U) + (1U << uCapacity);
 				}
 			}
 
@@ -262,11 +233,11 @@ namespace jrmwng
 							{
 								unsigned const ulPattern = ~0U + (1U << uCount1);
 
-								for (unsigned uIndex1 = _lzcnt_u64(uxlHitLockLSB); uIndex1 < 64; uIndex1 = _lzcnt_u64(uxlHitLockLSB))
+								for (unsigned uIndex1 = 63U - _lzcnt_u64(uxlHitLockLSB); uIndex1 < 64; uIndex1 = 63U - _lzcnt_u64(uxlHitLockLSB))
 								{
 									unsigned const uIndex = uIndex256 * 256 + uIndex64 * 64 + uIndex1;
 
-									alloc_info *pstInfo = memory_align<alloc_info>(m_pcBuffer + uGRANULARITY * uIndex + sizeof(alloc_info), uAlign) - 1;
+									alloc_info *pstInfo = memory_align<alloc_info>(m_pcBuffer + m_uGranularity * uIndex + sizeof(alloc_info), uAlign) - 1;
 									{
 										_mm_prefetch(reinterpret_cast<char const*>(pstInfo), _MM_HINT_T0);
 
@@ -276,8 +247,8 @@ namespace jrmwng
 										unsigned const ulOldLock1 = ulBitLock;
 										unsigned const ulPattern1 = ulPattern << uIndex1;
 
-										_bittestandreset(reinterpret_cast<long*>(&uxlHitLockLSB), uIndex1);
-										_bittestandreset(reinterpret_cast<long*>(&uxlHitLockMSB), uIndex1 + (uCount1 - 1));
+										_bittestandreset64(reinterpret_cast<long long*>(&uxlHitLockLSB), uIndex1);
+										_bittestandreset64(reinterpret_cast<long long*>(&uxlHitLockMSB), uIndex1 + (uCount1 - 1));
 
 										if ((ulOldLock1 & ulPattern1) != ulPattern1)
 										{
@@ -339,26 +310,25 @@ namespace jrmwng
 				{
 					for (unsigned uIndex2048 = 0; uIndex2048 * 8 < u256X; uIndex2048++) // 2048 = 32 * 64
 					{
-						unsigned long long const uxlHitLock8MSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock32MSB));
-						unsigned long long const uxlHitLock8LSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock32LSB));
+						long long xlHitLock32MSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock32MSB));
+						long long xlHitLock32LSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock32LSB));
 
 						ymmHitLock32LSB = _mm256_permute4x64_epi64(ymmHitLock32LSB, _MM_SHUFFLE(0, 3, 2, 1));
 						ymmHitLock32MSB = _mm256_permute4x64_epi64(ymmHitLock32MSB, _MM_SHUFFLE(0, 3, 2, 1));
 
-						for (unsigned uIndex64 = _tzcnt_u64(uxlHitLock8LSB); uIndex64 < 64; uIndex64 = _tzcnt_u64(uxlHitLock8LSB))
+						for (unsigned uIndex32 = _tzcnt_u64(xlHitLock32LSB); uIndex32 < 64; uIndex32 = _tzcnt_u64(xlHitLock32LSB))
 						{
-							unsigned const uIndex = uIndex2048 * 2048U + uIndex64 * 64U;
-							unsigned const uIndex32 = uIndex / 32U;
+							unsigned const uIndex = uIndex2048 * 2048U + uIndex32 * 32U;
 
-							_bittestandreset64(reinterpret_cast<long long*>(&uxlHitLock8LSB), uIndex64);
-							_bittestandreset64(reinterpret_cast<long long*>(&uxlHitLock8MSB), uIndex64 + (uCount32 - 1U));
+							_bittestandreset64(&xlHitLock32LSB, uIndex32);
+							_bittestandreset64(&xlHitLock32MSB, uIndex32 + (uCount32 - 1U));
 
-							alloc_info *pstInfo = memory_align<alloc_info>(pcBuffer + uGRANULARITY * uIndex + sizeof(alloc_info), uAlign) - 1;
+							alloc_info *pstInfo = memory_align<alloc_info>(m_pcBuffer + m_uGranularity * uIndex + sizeof(alloc_info), uAlign) - 1;
 							{
 								_mm_prefetch(reinterpret_cast<char const*>(pstInfo), _MM_HINT_T0);
 
-								long volatile * const plBitLockBegin = m_alBitLock + uIndex32;
-								long volatile * const plBitLockEnd = m_alBitLock + uIndex32 + uCount32;
+								long volatile * const plBitLockBegin = m_alBitLock + uIndex / 32U;
+								long volatile * const plBitLockEnd = m_alBitLock + uIndex / 32U + uCount32;
 
 								unsigned const uXBEGIN = _xbegin();
 
@@ -450,29 +420,29 @@ namespace jrmwng
 				{
 					for (unsigned uIndex512 = 0; uIndex512 + uIndex512 < u256X; uIndex512++) // 512 = 8 * 64
 					{
-						unsigned long long uxlHitLock8LSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock8LSB));
-						unsigned long long uxlHitLock8MSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock8MSB));
+						long long xlHitLock8LSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock8LSB));
+						long long xlHitLock8MSB = _mm_cvtsi128_si64(_mm256_castsi256_si128(ymmHitLock8MSB));
 
 						ymmHitLock8LSB = _mm256_permute4x64_epi64(ymmHitLock8LSB, _MM_SHUFFLE(0, 3, 2, 1));
 						ymmHitLock8MSB = _mm256_permute4x64_epi64(ymmHitLock8MSB, _MM_SHUFFLE(0, 3, 2, 1));
 
-						__m128i const xmmPattern = _mm_alignr_epi8(_mm_setzero_si128(), _mm_set1_epi32(~0), 16U - uCount8);
+						__m128i const xmmPattern = _mm_srli_si128(_mm_set1_epi32(~0), 16U - uCount8);
 						unsigned const uPattern = ~0U + (1U << uCount8);
 
-						for (unsigned uIndex8 = _tzcnt_u64(uxlHitLock8LSB); uIndex8 < 64; uIndex8 = _tzcnt_u64(uxlHitLock8LSB))
+						for (unsigned uIndex8 = _tzcnt_u64(xlHitLock8LSB); uIndex8 < 64; uIndex8 = _tzcnt_u64(xlHitLock8LSB))
 						{
 							unsigned const uIndex = uIndex512 * 512U + uIndex8 * 8U;
 							unsigned const uIndex128 = uIndex / 128U;
 
-							_bittestandreset(reinterpret_cast<long*>(&uxlHitLock8LSB), uIndex8);
-							_bittestandreset(reinterpret_cast<long*>(&uxlHitLock8MSB), uIndex8 + (uCount8 - 1U));
+							_bittestandreset64(&xlHitLock8LSB, uIndex8);
+							_bittestandreset64(&xlHitLock8MSB, uIndex8 + (uCount8 - 1U));
 
-							alloc_info *pstInfo = memory_align<alloc_info>(pcBuffer + uGRANULARITY * uIndex + sizeof(alloc_info), uAlign) - 1;
+							alloc_info *pstInfo = memory_align<alloc_info>(m_pcBuffer + m_uGranularity * uIndex + sizeof(alloc_info), uAlign) - 1;
 							{
 								_mm_prefetch(reinterpret_cast<char const*>(pstInfo), _MM_HINT_T0);
 
-								__m128i const xmmOldLock8 = m_axmmBitLock[uIndex128];
-								__m128i const xmmPattern8 = _mm_alignr_epi8(xmmPattern, _mm_setzero_si128(), 16U - uIndex8 % 16);
+								__m128i xmmOldLock8 = m_axmmBitLock[uIndex128];
+								__m128i const xmmPattern8 = _mm_slli_si128(xmmPattern, uIndex8 % 16U);
 								unsigned const uPattern8 = uPattern << uIndex8;
 
 								__m128i const xmmNewLock8 = _mm_andnot_si128(xmmPattern8, xmmOldLock8);
@@ -505,25 +475,25 @@ namespace jrmwng
 				_mm_prefetch(reinterpret_cast<char const*>(g_auAlignMask), _MM_HINT_T0);
 				_mm_prefetch(reinterpret_cast<char const*>(m_aymmBitLock), _MM_HINT_T0);
 
-				size_t const uActualSize = sizeof(alloc_info) + uSize + uAlign - 1;
+				size_t const uActualSize = sizeof(alloc_info) + uSize + (uAlign > alignof(alloc_info) ? uAlign - 1 : 0);
 
-				size_t const uCount1 = (uActualSize + uGRANULARITY - 1) / uGRANULARITY;
-				size_t const uCount8 = (uActualSize + uGRANULARITY * 8 - 1) / (uGRANULARITY * 8);
-				size_t const uCount32 = (uActualSize + uGRANULARITY * 32 - 1) / (uGRANULARITY * 32);
+				size_t const uCount1 = (uActualSize + m_uGranularity - 1) / m_uGranularity;
+				size_t const uCount8 = (uActualSize + m_uGranularity * 8 - 1) / (m_uGranularity * 8);
+				size_t const uCount32 = (uActualSize + m_uGranularity * 32 - 1) / (m_uGranularity * 32);
 
 				if (uSize == 0)
 				{
 					return nullptr;
 				}
-				else if (uCount1 <= 16)
+				else if (uCount1 < 16)
 				{
 					return malloc_by_count<__m256i, 1>(uCount1, uAlign);
 				}
-				else if (uCount8 <= 16)
+				else if (uCount8 < 16)
 				{
 					return malloc_by_count<__m256i, 8>(uCount8, uAlign);
 				}
-				else if (uCount32 <= 16)
+				else if (uCount32 < 16)
 				{
 					return malloc_by_count<__m256i, 32>(uCount32, uAlign);
 				}
@@ -551,7 +521,7 @@ namespace jrmwng
 					return free(pMem) ? nullptr : pMem;
 				}
 
-				_mm_prefetch(m_acBitLock, _MM_HINT_T0);
+				_mm_prefetch(const_cast<char const*>(m_acBitLock), _MM_HINT_T0);
 
 				alloc_info *pstInfo = reinterpret_cast<alloc_info*>(pMem) - 1;
 				{
@@ -574,12 +544,15 @@ namespace jrmwng
 					return true;
 				}
 
-				_mm_prefetch(m_acBitLock, _MM_HINT_T0);
+				_mm_prefetch(const_cast<char const*>(m_acBitLock), _MM_HINT_T0);
 
 				alloc_info *pstInfo = reinterpret_cast<alloc_info*>(pMem) - 1;
 				{
-					if (pstInfo->pHeap != this ||
-						pstInfo->uIndex > 256U * u256X ||
+					if (pstInfo->pHeap != this)
+					{
+						return pstInfo->pHeap->free(pMem);
+					}
+					if (pstInfo->uIndex > 256U * u256X ||
 						pstInfo->uIndex + pstInfo->uCount > 256U * u256X)
 					{
 						__debugbreak();
@@ -593,8 +566,6 @@ namespace jrmwng
 				unsigned const uCount1 = pstInfo->uCount % 32U;
 				unsigned const uPattern1 = ((~0U) + (1U << uCount1)) << uIndex1;
 				_mm_clflush(pstInfo);
-
-				unsigned const uPattern1 = uPattern << uIndex1;
 
 				long volatile & lBitLock = m_alBitLock[uIndex32];
 
@@ -629,71 +600,22 @@ namespace jrmwng
 			}
 		}
 
-		enum { LEVEL0_GRANULARITY = 64 }; // 64B -- cache-line size
-		enum { LEVEL0_CAPACITY = 256 };
-		enum { LEVEL1_GRANULARITY = LEVEL0_GRANULARITY * LEVEL0_CAPACITY }; // 16KB -- size of L1 cache
-		enum { LEVEL1_CAPACITY = 256 };
-		enum { LEVEL2_GRANULARITY = LEVEL1_GRANULARITY * LEVEL1_CAPACITY }; // 4MB -- size of LLC
-		enum { LEVEL2_CAPACITY = 256 };
-		enum { LEVEL3_GRANULARITY = LEVEL2_GRANULARITY * LEVEL2_CAPACITY }; // 1GB
-		enum { LEVEL3_CAPACITY = 1 };
-
-		using memory_heap_level0 = memory_heap<LEVEL0_GRANULARITY, LEVEL0_CAPACITY>;
-		using memory_heap_level1 = memory_heap<LEVEL1_GRANULARITY, LEVEL1_CAPACITY>;
-		using memory_heap_level2 = memory_heap<LEVEL2_GRANULARITY, LEVEL2_CAPACITY>;
-		using memory_heap_level3 = memory_heap<LEVEL3_GRANULARITY, LEVEL3_CAPACITY>;
-
-		using data_cache_level1 = memory_heap<64, 512>; // 64B * 512 = 32KB = 64B * 64sets * 8ways
-		using data_cache_level2 = memory_heap<1024, 256>; // 1024B * 256 = 256KB = 64B * 1024sets * 4ways
-		using data_cache_level3 = memory_heap<16384, 192>; // 16384B * 192 = 3MB = 64B * 4096sets * 12ways
-		using data_cache_level4 = memory_heap<262144, 128>; // 
-
 		//
 
 		void * const m_pBuffer;
 
-		memory_heap_level2 *m_apHeap2[LEVEL3_CAPACITY];
-		memory_heap_level1 *m_apHeap1[LEVEL3_CAPACITY * LEVEL2_CAPACITY];
-		memory_heap_level0 *m_apHeap0[LEVEL3_CAPACITY * LEVEL2_CAPACITY * LEVEL1_CAPACITY];
-
-		//
-
-		memory_heap_level2 m_aHeap[LEVEL3_CAPACITY];
-		memory_heap_level1 m_aaHeap[LEVEL3_CAPACITY][LEVEL2_CAPACITY];
-		memory_heap_level0 m_aaaHeap[LEVEL3_CAPACITY][LEVEL2_CAPACITY][LEVEL1_CAPACITY];
+		memory_heap m_Heap0;
 
 		memory_manager()
-			: m_pBuffer(VirtualAlloc(NULL, LEVEL3_GRANULARITY * LEVEL3_CAPACITY, MEM_RESERVE, PAGE_NOACCESS))
+			: m_pBuffer(VirtualAlloc(NULL, 32 * 512, MEM_RESERVE, PAGE_NOACCESS))
+			, m_Heap0(m_pBuffer, 32, 512)
 		{
 			if (m_pBuffer == NULL)
 			{
 				__debugbreak();
 			}
 
-			std::fill_n(m_apHeap2, std::size(m_apHeap2), nullptr);
-			std::fill_n(m_apHeap1, std::size(m_apHeap1), nullptr);
-			std::fill_n(m_apHeap0, std::size(m_apHeap0), nullptr);
-
-			//
-
-			char *pcBuffer = reinterpret_cast<char*>(m_pBuffer);
-
-			for (unsigned uIndex3 = 0; uIndex3 < LEVEL3_CAPACITY; uIndex3++)
-			{
-				new (&m_aHeap[uIndex3]) memory_heap_level2(pcBuffer, LEVEL2_CAPACITY);
-
-				for (unsigned uIndex2 = 0; uIndex2 < LEVEL2_CAPACITY; uIndex2++)
-				{
-					new (&m_aaHeap[uIndex3][uIndex2]) memory_heap_level1(pcBuffer, LEVEL1_CAPACITY);
-
-					for (unsigned uIndex1 = 0; uIndex1 < LEVEL1_CAPACITY; uIndex1++)
-					{
-						new (&m_aaaHeap[uIndex3][uIndex2][uIndex1]) memory_heap_level0(pcBuffer, LEVEL0_CAPACITY);
-
-						pcBuffer += LEVEL0_GRANULARITY * LEVEL0_CAPACITY;
-					}
-				}
-			}
+			// TODO
 		}
 		~memory_manager()
 		{
@@ -724,10 +646,6 @@ namespace jrmwng
 
 		void * malloc(size_t uSize, size_t uAlign)
 		{
-			size_t const uCount0 = (uSize + uAlign - 1 + LEVEL0_GRANULARITY - 1) / LEVEL0_GRANULARITY;
-			size_t const uCount1 = (uSize + uAlign - 1 + LEVEL1_GRANULARITY - 1) / LEVEL1_GRANULARITY;
-			size_t const uCount2 = (uSize + uAlign - 1 + LEVEL2_GRANULARITY - 1) / LEVEL2_GRANULARITY;
-
 			// TODO
 			return nullptr;
 		}
