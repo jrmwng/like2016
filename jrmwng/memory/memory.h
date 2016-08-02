@@ -17,19 +17,19 @@ namespace jrmwng
 		{
 			return reinterpret_cast<T*>((reinterpret_cast<uintptr_t>(pMem) + (uAlign - 1U)) & ~(uAlign - 1U));
 		}
-		template <size_t uSize, typename T1, typename T2, typename Tfunc, size_t... uIndex>
-		void memory_transform(T1 const (&at1)[uSize], T2(&at2)[uSize], Tfunc && tFunc, std::index_sequence<uIndex...>)
+		template <typename T1, size_t u1, typename T2, size_t u2, typename Tfunc, size_t... uIndex>
+		void memory_transform(T1 const (&at1)[u1], T2(&at2)[u2], Tfunc && tFunc, std::index_sequence<uIndex...>)
 		{
 			using type_t = int [];
 
 			(void) type_t {
-				(at2[uIndex] = std::forward<Tfunc>(tFunc)(at1[uSize]), 0)...
+				(at2[uIndex] = std::forward<Tfunc>(tFunc)(std::integral_constant<size_t, uIndex>(), at1[uIndex]), 0)...
 			};
 		}
-		template <size_t uSize, typename T1, typename T2, typename Tfunc>
-		void memory_transform(T1 const (&at1)[uSize], T2(&at2)[uSize], Tfunc && tFunc)
+		template <typename T1, size_t u1, typename T2, size_t u2, typename Tfunc>
+		void memory_transform(T1 const (&at1)[u1], T2(&at2)[u2], Tfunc && tFunc)
 		{
-			memory_transform(at1, at2, std::forward<Tfunc>(tFunc), std::make_index_sequence<uSize>());
+			memory_transform(at1, at2, std::forward<Tfunc>(tFunc), std::make_index_sequence<(u1 < u2 ? u1 : u2)>());
 		}
 		struct alignas(128) memory_stack
 		{
@@ -151,6 +151,10 @@ namespace jrmwng
 			union
 			{
 				__m256i m_aymmBitLock[u256X];
+				__m128i m_aaxmmBitLock[u256X][2];
+				__m128i m_axmmBitLock[u256X * 2];
+				long long volatile m_aaxlBitLock[u256X][4];
+				long long volatile m_axlBitLock[u256X * 4];
 				unsigned volatile m_aauBitLock[u256X][8];
 				unsigned volatile m_auBitLock[u256X * 8];
 				long volatile m_aalBitLock[u256X][8];
@@ -197,74 +201,64 @@ namespace jrmwng
 				unsigned uCount;
 			};
 
-			void * malloc(size_t uSize, size_t uAlign = 4)
+			void * malloc_by_count1(size_t uCount1, size_t uAlign)
 			{
-				_mm_prefetch(reinterpret_cast<char const*>(g_auAlignMask), _MM_HINT_T0);
-				_mm_prefetch(reinterpret_cast<char const*>(m_aymmBitLock), _MM_HINT_T0);
+				unsigned const uAlignMask = g_auAlignMask[uCount1];
 
-				if (uSize == 0)
+				__m256i const uw16AlignMaskLSB = _mm256_set1_epi32(uAlignMask);
+				__m256i const uw16AlignMaskMSB = _mm256_set1_epi32(uAlignMask << (uCount1 - 1U));
+
+				__m256i aul8HitLock[u256X];
 				{
-					return nullptr;
+					memory_transform(m_aymmBitLock, aul8HitLock, [&](auto uIndex256, __m256i const & ymmBitLock)->__m256i
+					{
+						__m256i const uw16OldLock0 = ymmBitLock;
+
+						__m256i const uw16XorLock1 = _mm256_xor_si256(uw16OldLock0, uw16AlignMaskLSB);
+						__m256i const uw16AvgLock1 = _mm256_avg_epu16(uw16OldLock0, uw16AlignMaskLSB);
+
+						__m256i const uw16AvgLock2 = _mm256_avg_epu16(uw16XorLock1, _mm256_setzero_si256());
+
+						__m256i const uw16XorLock3 = _mm256_xor_si256(uw16AvgLock1, uw16AvgLock2);
+
+						__m256i const uw16AndLock4 = _mm256_and_si256(uw16XorLock3, uw16AlignMaskMSB);
+
+						return uw16AndLock4;
+					});
 				}
 
-				size_t const uActualSize = sizeof(alloc_info) + uSize + uAlign - 1;
-
-				size_t const uCount1 = (uActualSize + uGRANULARITY - 1) / uGRANULARITY;
-				size_t const uCount8 = (uActualSize + uGRANULARITY * 8 - 1) / (uGRANULARITY * 8);
-				size_t const uCount32 = (uActualSize + uGRANULARITY * 32 - 1) / (uGRANULARITY * 32);
-
-				if (uCount1 <= 16)
+				for (unsigned uIndex256 = u256X; 0 < uIndex256--; )
 				{
-					unsigned const uAlignMask = g_auAlignMask[uCount1];
+					__m256i const ul8HitLock = aul8HitLock[uIndex256];
 
-					__m256i const uw16AlignMaskLSB = _mm256_set1_epi32(uAlignMask);
-					__m256i const uw16AlignMaskMSB = _mm256_set1_epi32(uAlignMask << (uCount1 - 1U));
+					__m256i const ul8CmpLock5 = _mm256_cmpeq_epi32(ul8HitLock, _mm256_setzero_si256());
+					__m256i ul8HitLockLSB = _mm256_srl_epi32(ul8HitLock, _mm_cvtsi32_si128(uCount1 - 1));
+					__m256i ul8HitLockMSB = ul8HitLock;
 
-					__m256i aul8HitLock[u256X];
+					int const nCmpLock6 = _mm256_movemask_epi8(ul8CmpLock5);
+
+					if (~nCmpLock6 != 0)
 					{
-						memory_transform(m_aymmBitLock, aul8HitLock, [&](__m256i const & ymmBitLock)->__m256i
+						for (unsigned uIndex32 = 0; uIndex32 < 8; uIndex32++)
 						{
-							__m256i const uw16OldLock0 = ymmBitLock;
+							unsigned ulHitLockLSB = _mm_cvtsi128_si32(_mm256_castsi256_si128(ul8HitLockLSB));
+							unsigned ulHitLockMSB = _mm_cvtsi128_si32(_mm256_castsi256_si128(ul8HitLockMSB));
 
-							__m256i const uw16XorLock1 = _mm256_xor_si256(uw16OldLock0, uw16AlignMaskLSB);
-							__m256i const uw16AvgLock1 = _mm256_avg_epu16(uw16OldLock0, uw16AlignMaskLSB);
+							ul8HitLockLSB = _mm256_permutevar8x32_epi32(ul8HitLockLSB, _mm256_set_epi32(0, 7, 6, 5, 4, 3, 2, 1));
+							ul8HitLockMSB = _mm256_permutevar8x32_epi32(ul8HitLockMSB, _mm256_set_epi32(0, 7, 6, 5, 4, 3, 2, 1));
 
-							__m256i const uw16AvgLock2 = _mm256_avg_epu16(uw16XorLock1, _mm256_setzero_si256());
-
-							__m256i const uw16XorLock3 = _mm256_xor_si256(uw16AvgLock1, uw16AvgLock2);
-
-							__m256i const uw16AndLock4 = _mm256_and_si256(uw16XorLock3, uw16AlignMaskMSB);
-
-							return uw16AndLock4;
-						});
-					}
-
-					for (unsigned uIndex256 = u256X; 0 < uIndex256--; )
-					{
-						__m256i const ul8HitLock = aul8HitLock[uIndex256];
-
-						__m256i const ul8CmpLock5 = _mm256_cmpeq_epi32(ul8HitLock, _mm256_setzero_si256());
-						__m256i ul8HitLockLSB = _mm256_srl_epi32(ul8HitLock, _mm_set1_epi32(uCount1 - 1));
-						__m256i ul8HitLockMSB = ul8HitLock;
-
-						long const lCmpLock6 = _mm256_movemask_epi8(ul8CmpLock5);
-
-						if (lCmpLock6 != ~0L)
-						{
-							for (unsigned uIndex32 = 0; uIndex32 < 8; uIndex32++)
+							if (ulHitLockLSB)
 							{
-								unsigned ulHitLockLSB = _mm_cvtsi128_si32(_mm256_castsi256_si128(ul8HitLockLSB));
-								unsigned ulHitLockMSB = _mm_cvtsi128_si32(_mm256_castsi256_si128(ul8HitLockMSB));
+								unsigned const ulPattern = (1U << uCount1) - 1U;
 
-								ul8HitLockLSB = _mm256_permutevar8x32_epi32(ul8HitLockLSB, _mm256_set_epi32(0, 7, 6, 5, 4, 3, 2, 1));
-								ul8HitLockMSB = _mm256_permutevar8x32_epi32(ul8HitLockMSB, _mm256_set_epi32(0, 7, 6, 5, 4, 3, 2, 1));
-
-								if (ulHitLockLSB)
+								for (unsigned uIndex1 = _lzcnt_u32(ulHitLockLSB); uIndex1 < 32; uIndex1 = _lzcnt_u32(ulHitLockLSB))
 								{
-									unsigned const ulPattern = (1U << uCount1) - 1U;
+									unsigned const uIndex = uIndex256 * 256 + uIndex32 * 32 + uIndex1;
 
-									for (unsigned uIndex1 = _lzcnt_u32(ulHitLockLSB); uIndex1 < 32; uIndex1 = _lzcnt_u32(ulHitLockLSB))
+									alloc_info *pstInfo = memory_align<alloc_info>(m_pcBuffer + uGRANULARITY * uIndex + sizeof(alloc_info), uAlign) - 1;
 									{
+										_mm_prefetch(reinterpret_cast<char const*>(pstInfo), _MM_HINT_T0);
+
 										unsigned volatile & ulBitLock = m_aauBitLock[uIndex256][uIndex32];
 										long volatile & lBitLock = m_aalBitLock[uIndex256][uIndex32];
 
@@ -276,20 +270,12 @@ namespace jrmwng
 
 										if ((ulOldLock1 & ulPattern1) != ulPattern1)
 										{
-											char * const pcBuffer = m_pcBuffer;
-											unsigned const uIndex = uIndex256 * 256 + uIndex32 * 32 + uIndex1;
-
-											alloc_info *pstInfo = memory_align<alloc_info>(pcBuffer + uGRANULARITY * uIndex + sizeof(alloc_info), uAlign) - 1;
+											if (_InterlockedCompareExchange(&lBitLock, ulOldLock1 ^ ulPattern1, ulOldLock1) == ulOldLock1)
 											{
-												_mm_prefetch(reinterpret_cast<char const*>(pstInfo), _MM_HINT_T0);
-
-												if (_InterlockedCompareExchange(&lBitLock, ulOldLock1 ^ ulPattern1, ulOldLock1) == ulOldLock1)
-												{
-													pstInfo->pHeap = this;
-													pstInfo->uIndex = uIndex;
-													pstInfo->uCount = uCount1;
-													return pstInfo + 1;
-												}
+												pstInfo->pHeap = this;
+												pstInfo->uIndex = uIndex;
+												pstInfo->uCount = uCount1;
+												return pstInfo + 1;
 											}
 										}
 									}
@@ -298,100 +284,127 @@ namespace jrmwng
 						}
 					}
 				}
-				else if (uCount8 <= 32)
+				return nullptr;
+			}
+			void * malloc_by_count8(size_t uCount8, size_t uAlign)
+			{
+				unsigned const uAlignMask8LSB = g_auAlignMask[uCount8];
+				unsigned const uAlignMask8MSB = RotateLeft32(uAlignMask8LSB, uCount8);
+
+				__m256i const uw16AlignMask8LSB = _mm256_set1_epi32(uAlignMask8LSB);
+				__m256i const uw16AlignMask8MSB = _mm256_set1_epi32(uAlignMask8LSB << (uCount8 - 1));
+
+				__m256i ymmOldLock8;
 				{
-					unsigned const uAlignMask8LSB = g_auAlignMask[uCount8];
-					unsigned const uAlignMask8MSB = RotateLeft32(uAlignMask8LSB, uCount8);
+					static_assert(u256X <= 8, "u256X should not exceed 8 by design (ymmOldLock8)");
 
-					unsigned auHitLock8[u256X];
+					memory_transform(m_aymmBitLock, ymmOldLock8.m256i_i32, [](auto uIndex32, __m256i const & ymmBitLock)->int
 					{
-						unsigned char ubCarry = 0;
-						memory_transform(m_aymmBitLock, auHitLock8, [](__m256i const & ymmBitLock)->unsigned
-						{
-							__m256i const ub32OldLock = ymmBitLock;
+						return _mm256_movemask_epi8(_mm256_cmpeq_epi8(ymmBitLock, _mm256_set1_epi8(0xFF)));
+					});
+				}
+				__m256i ymmHitLock8MSB;
+				__m256i ymmHitLock8LSB;
+				{
+					__m256i const uw16OldLock0 = ymmOldLock8;
 
-							__m256i const ub32CmpLock = _mm256_cmpeq_epi8(ub16OldLock, _mm256_set1_epi8(0xFF));
+					__m256i const uw16XorLock1 = _mm256_xor_si256(uw16OldLock0, uw16AlignMask8LSB);
+					__m256i const uw16AvgLock1 = _mm256_avg_epu16(uw16OldLock0, uw16AlignMask8LSB);
 
-							unsigned const uOldLock8 = _mm256_movemask_epi8(ub32CmpLock);
+					__m256i const uw16AvgLock2 = _mm256_avg_epu16(uw16XorLock1, _mm256_setzero_si256());
 
-							unsigned uAddLock8A;
-							ubCarry = _addcarryx_u32(ubCarry, uOldLock8, uAlignMask8LSB, &uAddLock8A);
-							unsigned const uXorLock8A = uOldLock8 ^ uAlignMask8LSB;
+					__m256i const uw16XorLock3 = _mm256_xor_si256(uw16AvgLock1, uw16AvgLock2);
 
-							unsigned const uXorLock8B = uAddLock8A ^ uXorLock8A;
+					__m256i const uw16AndLock4 = _mm256_and_si256(uw16XorLock3, uw16AlignMask8MSB);
 
-							unsigned const uAndLock8C = uXorLock8B & uAlignMask8MSB;
+					ymmHitLock8MSB = uw16AndLock4;
+					ymmHitLock8LSB = _mm256_srl_epi16(uw16AndLock4, _mm_cvtsi32_si128(uCount8 - 1));
+				}
 
-							return uAndLock8C;
-						});
-					}
-					for (unsigned uIndex256 = u256X; 0 < uIndex256--; )
+				__m256i const ymmCmpLock = _mm256_cmpeq_epi8(ymmHitLock8MSB, _mm256_setzero_si256());
+
+				int const nCmpLock = _mm256_movemask_epi8(ymmCmpLock);
+
+				if (~nCmpLock != 0)
+				{
+					for (unsigned uIndex256 = 0; uIndex256 < u256X; uIndex256++)
 					{
-						unsigned const uHitLock8 = auHitLock8[uIndex256];
+						unsigned const uHitLock8MSB = _mm_cvtsi128_si32(_mm256_castsi256_si128(ymmHitLock8MSB));
+						unsigned const uHitLock8LSB = _mm_cvtsi128_si32(_mm256_castsi256_si128(ymmHitLock8LSB));
 
-						for (unsigned uIndex8 = _tzcnt_u32(uHitLock8); uIndex8 < 32; uIndex8 = _tzcnt_u32(uHitLock8))
+						ymmHitLock8MSB = _mm256_permutevar8x32_epi32(ymmHitLock8MSB, _mm256_set_epi32(0, 7, 6, 5, 4, 3, 2, 1));
+						ymmHitLock8LSB = _mm256_permutevar8x32_epi32(ymmHitLock8LSB, _mm256_set_epi32(0, 7, 6, 5, 4, 3, 2, 1));
+
+						__m128i const xmmPattern = _mm_alignr_epi8(_mm_setzero_si128(), _mm_set1_epi32(~0), 16U - uCount8);
+						unsigned const uPattern = ~0U + (1U << uCount8);
+
+						for (unsigned uIndex8 = _tzcnt_u32(uHitLock8LSB); uIndex8 < 32; uIndex8 = _tzcnt_u32(uHitLock8LSB))
 						{
-							uHitLock8 = _blsr_u32(uHitLock8);
+							unsigned const uIndex = uIndex256 * 256 + uIndex8 * 8;
+							unsigned const uIndex128 = uIndex256 * 2 + uIndex8 / 16U;
 
-							unsigned const uIndex = uIndex256 * 256 + uIndex8 * 8 - 8;
+							uHitLock8MSB = _blsr_u32(uHitLock8MSB);
+							uHitLock8LSB = _blsr_u32(uHitLock8LSB);
 
 							alloc_info *pstInfo = memory_align<alloc_info>(pcBuffer + uGRANULARITY * uIndex + sizeof(alloc_info), uAlign) - 1;
 							{
 								_mm_prefetch(reinterpret_cast<char const*>(pstInfo), _MM_HINT_T0);
 
-								char volatile *pcBitLockBegin = m_aacBitLock[uIndex256] + uIndex8;
-								char volatile *pcBitLockEnd = m_aacBitLock[uIndex256] + uIndex8 + uCount8;
+								__m128i const xmmOldLock8 = m_axmmBitLock[uIndex128];
+								__m128i const xmmPattern8 = _mm_alignr_epi8(xmmPattern, _mm_setzero_si128(), 16U - uIndex8 % 16);
+								unsigned const uPattern8 = uPattern << uIndex8;
 
-								unsigned const uXBEGIN = _xbegin();
+								__m128i const xmmNewLock8 = _mm_andnot_si128(xmmPattern8, xmmOldLock8);
+								__m128i const xmmCmpLock8 = _mm_cmpeq_epi32(xmmPattern8, xmmOldLock8);
 
-								if (std::all_of(pcBitLockBegin, pcBitLockEnd, [&](char volatile & cBitLock)->bool
+								int const nCmpLock8 = _mm_movemask_epi8(xmmCmpLock8);
+
+								if ((nCmpLock8 & uPattern8) == uPattern8)
 								{
-									if (_xtest())
+									if (_InterlockedCompareExchange128(
+										&m_axlBitLock[uIndex128 * 2],
+										_mm_extract_epi64(xmmNewLock8, 1),
+										_mm_extract_epi64(xmmNewLock8, 0),
+										xmmOldLock8.m128i_i64))
 									{
-										if (cBitLock == 0xFF)
-										{
-											cBitLock = 0;
-											return true;
-										}
-										else
-										{
-											_xabort(0);
-											return false;
-										}
+										pstInfo->pHeap = this;
+										pstInfo->uIndex = uIndex;
+										pstInfo->uCount = uCount8 * 8;
+										return pstInfo + 1;
 									}
-									else if (_InterlockedCompareExchange8(&cBitLock, 0, 0xFF) == 0xFF)
-									{
-										return true;
-									}
-									else
-									{
-										std::for_each(m_aacBitLock[uIndex256] + uIndex8, &cBitLock, [&](char volatile & cBitLock)
-										{
-											cBitLock = 0;
-										});
-										return false;
-									}
-								}))
-								{
-									if (uXBEGIN == _XBEGIN_STARTED)
-									{
-										_xend();
-									}
-									pstInfo->pHeap = this;
-									pstInfo->uIndex = uIndex;
-									pstInfo->uCount = uCount8 * 8;
-									return pstInfo + 1;
 								}
 							}
 						}
 					}
 				}
+				return nullptr;
+			}
+			void * malloc(size_t uSize, size_t uAlign = 4)
+			{
+				_mm_prefetch(reinterpret_cast<char const*>(g_auAlignMask), _MM_HINT_T0);
+				_mm_prefetch(reinterpret_cast<char const*>(m_aymmBitLock), _MM_HINT_T0);
+
+				size_t const uActualSize = sizeof(alloc_info) + uSize + uAlign - 1;
+
+				size_t const uCount1 = (uActualSize + uGRANULARITY - 1) / uGRANULARITY;
+				size_t const uCount8 = (uActualSize + uGRANULARITY * 8 - 1) / (uGRANULARITY * 8);
+
+				if (uSize == 0)
+				{
+					return nullptr;
+				}
+				else if (uCount1 <= 16)
+				{
+					return malloc_by_count1(uCount1, uAlign);
+				}
+				else if (uCount8 <= 16)
+				{
+					return malloc_by_count8(uCount8, uAlign);
+				}
 				else
 				{
-					// NOP
+					return nullptr;
 				}
-
-				return nullptr;
 			}
 			void * calloc(size_t uSize, size_t uN, size_t uAlign = 4)
 			{
@@ -412,6 +425,19 @@ namespace jrmwng
 					return free(pMem) ? nullptr : pMem;
 				}
 
+				_mm_prefetch(m_acBitLock, _MM_HINT_T0);
+
+				alloc_info *pstInfo = reinterpret_cast<alloc_info*>(pMem) - 1;
+				{
+					if (pstInfo->pHeap != this ||
+						pstInfo->uIndex > 256U * u256X ||
+						pstInfo->uIndex + pstInfo->uCount > 256U * u256X)
+					{
+						__debugbreak();
+						return nullptr;
+					}
+				}
+
 				// TODO
 				return nullptr;
 			}
@@ -421,11 +447,14 @@ namespace jrmwng
 				{
 					return true;
 				}
+
+				_mm_prefetch(m_acBitLock, _MM_HINT_T0);
+
 				alloc_info *pstInfo = reinterpret_cast<alloc_info*>(pMem) - 1;
 				{
 					if (pstInfo->pHeap != this ||
 						pstInfo->uIndex > 256U * u256X ||
-						pstInfo->uIndex + pstInfo->uCount1 > 256U * u256X)
+						pstInfo->uIndex + pstInfo->uCount > 256U * u256X)
 					{
 						__debugbreak();
 						return false;
@@ -434,8 +463,8 @@ namespace jrmwng
 
 				unsigned const uIndex32 = pstInfo->uIndex / 32U;
 				unsigned const uIndex1 = pstInfo->uIndex % 32U;
-				unsigned const uCount32 = pstInfo->uCount1 / 32U;
-				unsigned const uCount1 = pstInfo->uCount1 % 32U;
+				unsigned const uCount32 = pstInfo->uCount / 32U;
+				unsigned const uCount1 = pstInfo->uCount % 32U;
 				unsigned const uPattern1 = ((~0U) + (1U << uCount1)) << uIndex1;
 				_mm_clflush(pstInfo);
 
