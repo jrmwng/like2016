@@ -11,6 +11,10 @@ int main()
 
 	auto spCompute = std::make_shared<decltype(fnCompute)>(fnCompute);
 
-	std::cout << jrmwng::compute_cache(spCompute, "Hello World!") << std::endl;
+	std::cout << jrmwng::compute_cache(std::forward<decltype(spCompute)>(spCompute), "Hello World!") << std::endl;
+
+	std::cout << jrmwng::compute_cache(&printf, "%s\n", "Hello World!", spCompute) << std::endl;
+	spCompute.reset();
+	std::cout << jrmwng::compute_cache(&printf, "%s\n", "Hello World!", spCompute) << std::endl;
 	return 0;
 }
