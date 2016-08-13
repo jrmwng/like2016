@@ -62,7 +62,6 @@ namespace jrmwng
 		}
 
 	public:
-		template <typename Tcompute, typename... Targs>
 		auto compute_cache(Tcompute && tCompute, Targs && ...tArgs)
 		{
 			auto keyCache = make_key(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...);
