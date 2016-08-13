@@ -4,17 +4,9 @@
 
 int main()
 {
-	auto const fnCompute = [](auto tArg)
-	{
-		return tArg;
-	};
+	std::shared_ptr<void> spVoid(new int);
 
-	auto spCompute = std::make_shared<decltype(fnCompute)>(fnCompute);
-
-	std::cout << jrmwng::compute_cache(std::forward<decltype(spCompute)>(spCompute), "Hello World!") << std::endl;
-
-	std::cout << jrmwng::compute_cache(&printf, "%s\n", "Hello World!", spCompute) << std::endl;
-	spCompute.reset();
-	std::cout << jrmwng::compute_cache(&printf, "%s\n", "Hello World!", spCompute) << std::endl;
+	std::cout << jrmwng::compute_cache(&printf, "%s\n", "Hello World!", spVoid) << std::endl;
+	std::cout << jrmwng::compute_cache(&printf, "%s\n", "Hello World!", spVoid) << std::endl;
 	return 0;
 }

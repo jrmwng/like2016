@@ -13,12 +13,37 @@ namespace jrmwng
 	struct compute_cache_manager_base
 	{
 		template <typename T>
-		static T get_key(T && t)
+		static T get_key(T t)
 		{
 			return t;
 		}
 		template <typename T>
+		static T * get_key(std::shared_ptr<T> volatile && sp)
+		{
+			return sp.get();
+		}
+		template <typename T>
+		static T * get_key(std::shared_ptr<T> const && sp)
+		{
+			return sp.get();
+		}
+		template <typename T>
 		static T * get_key(std::shared_ptr<T> && sp)
+		{
+			return sp.get();
+		}
+		template <typename T>
+		static T * get_key(std::shared_ptr<T> volatile & sp)
+		{
+			return sp.get();
+		}
+		template <typename T>
+		static T * get_key(std::shared_ptr<T> const & sp)
+		{
+			return sp.get();
+		}
+		template <typename T>
+		static T * get_key(std::shared_ptr<T> & sp)
 		{
 			return sp.get();
 		}
@@ -43,33 +68,34 @@ namespace jrmwng
 	class compute_cache_manager
 		: compute_cache_manager_base
 	{
-		std::shared_ptr<Tmap> m_spComputeCacheMap;
+		std::shared_ptr<Tmap> const m_spComputeCacheMap;
 
 		template <typename T, typename Tkey>
-		void install_evict_cache(T && t, Tkey const & keyCache)
+		void install_evict_cache(T && t, Tkey & keyCache)
 		{
 			// NOP
 		}
 		template <typename T, typename Tkey>
-		void install_evict_cache(std::shared_ptr<T> && sp, Tkey const & keyCache)
+		void install_evict_cache(std::shared_ptr<T> & sp, Tkey keyCache)
 		{
-			std::shared_ptr<Tmap> spComputeCacheMap(m_spComputeCacheMap);
-
-			sp.reset(sp.get(), [sp, spComputeCacheMap, keyCache](T *pt)
+			if (sp)
 			{
-				spComputeCacheMap->erase(keyCache);
-			});
+				T *pt = sp.get();
+				sp.reset(pt, [spCopy = std::move(sp), spComputeCacheMap = m_spComputeCacheMap, keyCache](T *pt)
+				{
+					spComputeCacheMap->erase(keyCache);
+				});
+			}
 		}
 
 	public:
+		compute_cache_manager()
+			: m_spComputeCacheMap(new Tmap)
+		{}
+
 		auto compute_cache(Tcompute && tCompute, Targs && ...tArgs)
 		{
 			auto keyCache = make_key(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...);
-
-			if (!m_spComputeCacheMap)
-			{
-				m_spComputeCacheMap.reset(new Tmap);
-			}
 
 			if (m_spComputeCacheMap->find(keyCache) == m_spComputeCacheMap->end())
 			{
