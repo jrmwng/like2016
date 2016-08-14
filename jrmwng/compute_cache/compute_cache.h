@@ -115,14 +115,14 @@ namespace jrmwng
 	template <typename Tmap, typename... Targs>
 	compute_cache_manager<Tmap, Targs...> thread_local compute_cache_manager<Tmap, Targs...>::g_Instance;
 
-	template <typename Tcompute, typename... Targs>
-	auto compute_cache(Tcompute && tCompute, Targs && ...tArgs)
+	template <typename... Targs>
+	auto compute_cache(Targs && ...tArgs)
 	{
-		using compute_t = decltype(compute_cache_manager_base::make_key(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...));
-		using cache_t = decltype(compute_cache_manager_base::compute(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...));
+		using compute_t = decltype(compute_cache_manager_base::make_key(std::forward<Targs>(tArgs)...));
+		using cache_t = decltype(compute_cache_manager_base::compute(std::forward<Targs>(tArgs)...));
 		using map_t = std::map<compute_t, cache_t>;
 
-		return compute_cache_manager<map_t, Tcompute, Targs...>::g_Instance.compute_cache(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...);
+		return compute_cache_manager<map_t, Targs...>::g_Instance.compute_cache(std::forward<Targs>(tArgs)...);
 	}
 
 }
