@@ -96,17 +96,21 @@ namespace jrmwng
 		{
 			auto keyComputeCache = make_compute(std::forward<Targs>(tArgs)...);
 
-			if (m_spComputeCacheMap->find(keyComputeCache) == m_spComputeCacheMap->end())
-			{
-				(*m_spComputeCacheMap)[keyComputeCache] = std::move(make_cache(std::forward<Targs>(tArgs)...));
+			auto itComputeCache = m_spComputeCacheMap->find(keyComputeCache);
 
+			if (itComputeCache != m_spComputeCacheMap->end())
+			{
+				return itComputeCache->second;
+			}
+			else
+			{
 				using for_each_t = int [];
 				(void) for_each_t {
 					(install_eviction(std::forward<Targs>(tArgs), keyComputeCache), 0)...
 				};
-			}
 
-			return (*m_spComputeCacheMap)[keyComputeCache];
+				return (*m_spComputeCacheMap)[keyComputeCache] = std::move(make_cache(std::forward<Targs>(tArgs)...));
+			}
 		}
 
 		static compute_cache_manager thread_local g_Instance;
