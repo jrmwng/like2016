@@ -27,8 +27,11 @@ int main()
 	auto spRDTSC0 = std::make_shared<decltype(fnRDTSC)>(fnRDTSC);
 	auto spRDTSC1 = std::make_shared<decltype(fnRDTSC)>(fnRDTSC);
 
+	// WriteLine: 1234
 	std::cout << jrmwng::compute_cache(spRDTSC0) << std::endl;
+	// WriteLine: 5678
 	std::cout << jrmwng::compute_cache(spRDTSC1) << std::endl;
+	// WriteLine: 1234
 	std::cout << jrmwng::compute_cache(spRDTSC0) << std::endl;
 	return 0;
 }
