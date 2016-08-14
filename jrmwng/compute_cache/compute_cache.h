@@ -55,12 +55,12 @@ namespace jrmwng
 		template <typename Tfunc, typename... Targs>
 		static auto compute(Tfunc && tFunc, Targs && ...tArgs)
 		{
-			return std::forward<Tfunc>(tFunc)(tArgs...);
+			return std::forward<Tfunc>(tFunc)(std::forward<Targs>(tArgs)...);
 		}
 		template <typename Tfunc, typename... Targs>
 		static auto compute(std::shared_ptr<Tfunc> & spFunc, Targs && ...tArgs)
 		{
-			return (*spFunc)(tArgs...);
+			return (*spFunc)(std::forward<Targs>(tArgs)...);
 		}
 	};
 	template <typename Tmap, typename Tcompute, typename... Targs>
