@@ -5,7 +5,6 @@
 #include <memory>
 #include <tuple>
 #include <map>
-#include <array>
 #include <type_traits>
 
 namespace jrmwng
