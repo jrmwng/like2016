@@ -12,7 +12,7 @@ namespace jrmwng
 {
 	struct compute_cache_manager_base
 	{
-		template <typename T>
+		template <typename T, typename Tenable = std::less<T>>
 		static T get_key(T t)
 		{
 			return t;
@@ -47,10 +47,10 @@ namespace jrmwng
 		{
 			return sp.get();
 		}
-		template <typename Tfunc, typename... Targs>
-		static auto make_key(Tfunc && tFunc, Targs && ...tArgs)
+		template <typename... Targs>
+		static auto make_key(Targs && ...tArgs)
 		{
-			return std::make_tuple(get_key(std::forward<Tfunc>(tFunc)), get_key(std::forward<Targs>(tArgs))...);
+			return std::make_tuple(get_key(std::forward<Targs>(tArgs))...);
 		}
 
 		template <typename Tfunc, typename... Targs>
@@ -59,7 +59,7 @@ namespace jrmwng
 			return std::forward<Tfunc>(tFunc)(tArgs...);
 		}
 		template <typename Tfunc, typename... Targs>
-		static auto compute(std::shared_ptr<Tfunc> && spFunc, Targs && ...tArgs)
+		static auto compute(std::shared_ptr<Tfunc> & spFunc, Targs && ...tArgs)
 		{
 			return (*spFunc)(tArgs...);
 		}
@@ -71,12 +71,12 @@ namespace jrmwng
 		std::shared_ptr<Tmap> const m_spComputeCacheMap;
 
 		template <typename T, typename Tkey>
-		void install_evict_cache(T && t, Tkey & keyCache)
+		void install_eviction(T && t, Tkey & keyCache)
 		{
 			// NOP
 		}
 		template <typename T, typename Tkey>
-		void install_evict_cache(std::shared_ptr<T> & sp, Tkey keyCache)
+		void install_eviction(std::shared_ptr<T> & sp, Tkey keyCache)
 		{
 			if (sp)
 			{
@@ -100,13 +100,13 @@ namespace jrmwng
 			if (m_spComputeCacheMap->find(keyCache) == m_spComputeCacheMap->end())
 			{
 				(*m_spComputeCacheMap)[keyCache] = std::move(compute(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...));
-			}
 
-			using for_each_t = int [];
-			(void) for_each_t {
-				(install_evict_cache(std::forward<Tcompute>(tCompute), keyCache), 0),
-				(install_evict_cache(std::forward<Targs>(tArgs), keyCache), 0)...
-			};
+				using for_each_t = int [];
+				(void) for_each_t {
+					(install_eviction(std::forward<Tcompute>(tCompute), keyCache), 0),
+						(install_eviction(std::forward<Targs>(tArgs), keyCache), 0)...
+				};
+			}
 
 			return (*m_spComputeCacheMap)[keyCache];
 		}
@@ -120,9 +120,11 @@ namespace jrmwng
 	template <typename Tcompute, typename... Targs>
 	auto compute_cache(Tcompute && tCompute, Targs && ...tArgs)
 	{
-		using cache_map_t = std::map<decltype(compute_cache_manager_base::make_key(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...)), decltype(compute_cache_manager_base::compute(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...))>;
+		using compute_t = decltype(compute_cache_manager_base::make_key(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...));
+		using cache_t = decltype(compute_cache_manager_base::compute(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...));
+		using map_t = std::map<compute_t, cache_t>;
 
-		return compute_cache_manager<cache_map_t, Tcompute, Targs...>::g_Instance.compute_cache(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...);
+		return compute_cache_manager<map_t, Tcompute, Targs...>::g_Instance.compute_cache(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...);
 	}
 
 }
