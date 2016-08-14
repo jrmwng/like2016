@@ -75,12 +75,12 @@ namespace jrmwng
 			// NOP
 		}
 		template <typename T, typename Tkey>
-		void install_eviction(std::shared_ptr<T> & sp, Tkey keyComputeCache)
+		void install_eviction(std::shared_ptr<T> & spArg, Tkey keyComputeCache)
 		{
-			if (sp)
+			if (spArg)
 			{
-				T *pt = sp.get();
-				sp.reset(pt, [spCopy = std::move(sp), spComputeCacheMap = m_spComputeCacheMap, keyComputeCache](T *pt)
+				T *pt = spArg.get();
+				spArg.reset(pt, [spPin = std::move(spArg), spComputeCacheMap = m_spComputeCacheMap, keyComputeCache](T *pt)
 				{
 					spComputeCacheMap->erase(keyComputeCache);
 				});
