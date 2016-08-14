@@ -63,7 +63,7 @@ namespace jrmwng
 			return (*spFunc)(std::forward<Targs>(tArgs)...);
 		}
 	};
-	template <typename Tmap, typename Tcompute, typename... Targs>
+	template <typename Tmap, typename... Targs>
 	class compute_cache_manager
 		: compute_cache_manager_base
 	{
@@ -92,18 +92,17 @@ namespace jrmwng
 			: m_spComputeCacheMap(new Tmap)
 		{}
 
-		auto compute_cache(Tcompute && tCompute, Targs && ...tArgs)
+		auto compute_cache(Targs && ...tArgs)
 		{
-			auto keyCache = make_key(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...);
+			auto keyCache = make_key(std::forward<Targs>(tArgs)...);
 
 			if (m_spComputeCacheMap->find(keyCache) == m_spComputeCacheMap->end())
 			{
-				(*m_spComputeCacheMap)[keyCache] = std::move(compute(std::forward<Tcompute>(tCompute), std::forward<Targs>(tArgs)...));
+				(*m_spComputeCacheMap)[keyCache] = std::move(compute(std::forward<Targs>(tArgs)...));
 
 				using for_each_t = int [];
 				(void) for_each_t {
-					(install_eviction(std::forward<Tcompute>(tCompute), keyCache), 0),
-						(install_eviction(std::forward<Targs>(tArgs), keyCache), 0)...
+					(install_eviction(std::forward<Targs>(tArgs), keyCache), 0)...
 				};
 			}
 
@@ -113,8 +112,8 @@ namespace jrmwng
 		static compute_cache_manager thread_local g_Instance;
 	};
 
-	template <typename Tmap, typename Tcompute, typename... Targs>
-	compute_cache_manager<Tmap, Tcompute, Targs...> thread_local compute_cache_manager<Tmap, Tcompute, Targs...>::g_Instance;
+	template <typename Tmap, typename... Targs>
+	compute_cache_manager<Tmap, Targs...> thread_local compute_cache_manager<Tmap, Targs...>::g_Instance;
 
 	template <typename Tcompute, typename... Targs>
 	auto compute_cache(Tcompute && tCompute, Targs && ...tArgs)
